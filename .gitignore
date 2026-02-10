@@ -4,5 +4,5 @@
 /frontend/dist/
 .DS_Store
 .idea
-.vscodeclient_secret*.json
+.vscode/
 client_secret*.json
