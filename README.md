@@ -80,7 +80,7 @@ Para permitir la comunicación fluida entre `localhost:5173` (Frontend) y `local
 * **Resultado:** La cookie de sesión (`laravel_session`) persiste en el navegador y se envía automáticamente en cada petición a la API (`/api/user`), permitiendo identificar al usuario tras el login de Google.
 
 ### Seguridad
-* **Gestión de Secretos:** El archivo `.env` está excluido del control de versiones.
+* **Gestión de Secretos:** El archivo `.env` y las credenciales `client_secret*.json` están excluidos del control de versiones.
 * **Sanitización:** El Frontend implementa limpieza de respuestas JSON para evitar errores de parseo en entornos de desarrollo (bug del carácter `<` en respuestas PHP).
 
 ---
@@ -122,5 +122,15 @@ sequenceDiagram
 3.  **Hidratación de Estado:** Al cargar el Dashboard, React consulta el endpoint `/api/user`. Gracias a la configuración de credenciales compartidas (CORS + Cookies), Laravel reconoce al usuario y devuelve sus datos privados para personalizar la interfaz.
 
 ---
-**Estado del Proyecto:** 🟢 Fase 1 (Autenticación & Perfil) Completada.
+
+## 📅 Hoja de Ruta del Proyecto
+
+| Fase | Estado | Descripción |
+| :--- | :---: | :--- |
+| **1. Infraestructura & Auth** | ✅ | Docker, React, Laravel, Google Login, Dashboard Usuario. |
+| **2. Catálogo de Productos** | ⏳ | Modelos DB, Migraciones, Seeders, Galería Frontend. |
+| **3. Carrito de Compra** | ⬜ | Gestión de estado (Context API), Lógica de negocio. |
+| **4. Pasarela de Pagos** | ⬜ | Simulación de checkout y pedidos. |
+
+---
 **Autor:** Ángel - Desarrollador Full Stack Junior
