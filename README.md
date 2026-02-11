@@ -8,9 +8,10 @@ El proyecto integra una API RESTful robusta en Laravel con una interfaz de usuar
 ### Backend (API)
 * **Framework:** Laravel 11
 * **Lenguaje:** PHP 8.3
-* **Autenticación:** Laravel Socialite (Google OAuth) + Laravel Sanctum (Session/Cookies)
 * **Base de Datos:** MariaDB 11.4
-* **Configuración:** CORS configurado para aceptar credenciales en `localhost`.
+* **Autenticación:** Laravel Socialite (Google OAuth) + Laravel Sanctum (Session/Cookies)
+* **API:** RESTful JSON
+* **Configuración:** CORS configurado para aceptar credenciales (`Access-Control-Allow-Credentials`).
 
 ### Frontend (SPA)
 * **Framework:** React 18
@@ -27,7 +28,7 @@ El proyecto integra una API RESTful robusta en Laravel con una interfaz de usuar
 
 ## 🛠️ Guía de Despliegue (Entorno Local)
 
-Sigue estos pasos para inicializar el entorno de desarrollo.
+Sigue estos pasos para inicializar el entorno de desarrollo desde cero.
 
 ### 1. Inicializar Servicios Backend
 
@@ -46,11 +47,13 @@ cp .env.example .env
 # Levantar contenedores
 ./vendor/bin/sail up -d
 
-# Instalación de dependencias y migraciones
+# Instalación de dependencias
 ./vendor/bin/sail composer install
-./vendor/bin/sail artisan config:publish cors # Publicar config de CORS
 ./vendor/bin/sail artisan key:generate
-./vendor/bin/sail artisan migrate
+
+# ⚡ BASE DE DATOS Y DATOS DE PRUEBA (NUEVO)
+# Este comando crea las tablas y rellena la tienda con productos falsos
+./vendor/bin/sail artisan migrate:fresh --seed
 ```
 
 ### 2. Inicializar Cliente Frontend
@@ -67,25 +70,25 @@ npm install
 npm run dev
 ```
 
-Acceso a la aplicación: [http://localhost:5173](http://localhost:5173)
+* **Frontend:** [http://localhost:5173](http://localhost:5173)
+* **API Productos:** [http://localhost/api/products](http://localhost/api/products)
 
 ---
 
-## 💡 Notas Técnicas Importantes
+## 🔌 API Endpoints Documentados
 
-### Gestión de CORS y Cookies (Auth Loop Fix)
-Para permitir la comunicación fluida entre `localhost:5173` (Frontend) y `localhost` (Backend):
-* **CORS:** Se ha habilitado `supports_credentials => true` en `config/cors.php` y añadido el origen del frontend.
-* **Axios:** Se ha configurado `axios.defaults.withCredentials = true` en el `main.jsx` de React.
-* **Resultado:** La cookie de sesión (`laravel_session`) persiste en el navegador y se envía automáticamente en cada petición a la API (`/api/user`), permitiendo identificar al usuario tras el login de Google.
+Actualmente la API expone los siguientes puntos de entrada:
 
-### Seguridad
-* **Gestión de Secretos:** El archivo `.env` y las credenciales `client_secret*.json` están excluidos del control de versiones.
-* **Sanitización:** El Frontend implementa limpieza de respuestas JSON para evitar errores de parseo en entornos de desarrollo (bug del carácter `<` en respuestas PHP).
+| Método | Endpoint | Descripción | Acceso |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/sanctum/csrf-cookie` | Inicializa la protección CSRF | 🌍 Público |
+| `GET` | `/auth/google/redirect` | Inicia flujo OAuth con Google | 🌍 Público |
+| `GET` | `/api/user` | Obtener perfil del usuario (JSON) | 🔐 Privado (Auth) |
+| `GET` | `/api/products` | Catálogo completo de productos | 🌍 Público |
 
 ---
 
-## 🔐 Flujo de Autenticación Completo (OAuth 2.0 + Perfil)
+## 🔐 Flujo de Autenticación (OAuth 2.0 + Perfil)
 
 El sistema implementa un flujo híbrido: OAuth para la identidad inicial y Cookies de Sesión para la persistencia.
 
@@ -116,10 +119,20 @@ sequenceDiagram
     FE->>User: Muestra "Hola, [Nombre]"
 ```
 
-### Descripción del Ciclo
-1.  **Login Social:** El usuario se autentica contra Google.
-2.  **Persistencia:** Laravel crea una sesión segura asociada al email devuelto por Google.
-3.  **Hidratación de Estado:** Al cargar el Dashboard, React consulta el endpoint `/api/user`. Gracias a la configuración de credenciales compartidas (CORS + Cookies), Laravel reconoce al usuario y devuelve sus datos privados para personalizar la interfaz.
+---
+
+## 💡 Notas Técnicas Importantes
+
+### Gestión de CORS y Cookies
+Para permitir la comunicación fluida entre `localhost:5173` (Frontend) y `localhost` (Backend):
+* **CORS:** Se ha habilitado `supports_credentials => true` en `config/cors.php`.
+* **Axios:** Se ha configurado `axios.defaults.withCredentials = true` en el frontend.
+* **Resultado:** La cookie de sesión (`laravel_session`) persiste en el navegador.
+
+### Base de Datos (Seeders)
+El proyecto incluye un `DatabaseSeeder` que genera automáticamente:
+* Productos de ejemplo (Laptops, Auriculares, Monitores).
+* Imágenes de placeholder.
 
 ---
 
@@ -128,8 +141,8 @@ sequenceDiagram
 | Fase | Estado | Descripción |
 | :--- | :---: | :--- |
 | **1. Infraestructura & Auth** | ✅ | Docker, React, Laravel, Google Login, Dashboard Usuario. |
-| **2. Catálogo de Productos** | ⏳ | Modelos DB, Migraciones, Seeders, Galería Frontend. |
-| **3. Carrito de Compra** | ⬜ | Gestión de estado (Context API), Lógica de negocio. |
+| **2. Catálogo de Productos** | ✅ | Modelos DB, Migraciones, Seeders, API REST, Frontend Grid. |
+| **3. Carrito de Compra** | ⏳ | Gestión de estado (Context API), Lógica de negocio. |
 | **4. Pasarela de Pagos** | ⬜ | Simulación de checkout y pedidos. |
 
 ---
