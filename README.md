@@ -1,7 +1,7 @@
 # 🛒 AICOR Shop - Full Stack E-commerce
 
-Plataforma de comercio electrónico Full Stack implementada con arquitectura desacoplada (Headless).
-El proyecto integra una API RESTful robusta en Laravel con una interfaz de usuario reactiva moderna.
+Plataforma de comercio electrónico Full Stack implementada con arquitectura desacoplada (Headless). 
+El proyecto integra una API RESTful robusta en Laravel con una interfaz de usuario reactiva moderna en React.
 
 ## 🚀 Stack Tecnológico
 
@@ -9,19 +9,20 @@ El proyecto integra una API RESTful robusta en Laravel con una interfaz de usuar
 * **Framework:** Laravel 11
 * **Lenguaje:** PHP 8.3
 * **Base de Datos:** MariaDB 11.4
-* **Autenticación:** Laravel Socialite (Google OAuth) + Laravel Sanctum (Session/Cookies)
-* **API:** RESTful JSON
+* **Autenticación:** Laravel Socialite (Google OAuth) + Laravel Sanctum (Session/Cookies).
+* **API:** RESTful JSON.
 * **Configuración:** CORS configurado para aceptar credenciales (`Access-Control-Allow-Credentials`).
 
 ### Frontend (SPA)
 * **Framework:** React 18
-* **Build Tool:** Vite
-* **Estilos:** Tailwind CSS v3.4
-* **Routing:** React Router DOM v6
-* **HTTP Client:** Axios (Configurado globalmente con `withCredentials = true`).
+* **Estado Global:** React Context API (Gestión de Carrito y UI).
+* **Build Tool:** Vite.
+* **Estilos:** Tailwind CSS v3.4.
+* **Routing:** React Router DOM v6.
+* **HTTP Client:** Axios (Configurado con `withCredentials = true`).
 
 ### Infraestructura (DevSecOps)
-* **Contenerización:** Docker & Laravel Sail
+* **Contenerización:** Docker & Laravel Sail.
 * **Arquitectura:** Soporte nativo para ARM64 (Apple Silicon) y AMD64.
 
 ---
@@ -40,10 +41,6 @@ cd backend
 # Configuración de variables de entorno
 cp .env.example .env
 
-# IMPORTANTE: Asegurar estas variables en .env para el Login
-# SESSION_DOMAIN=localhost
-# SANCTUM_STATEFUL_DOMAINS=localhost:5173
-
 # Levantar contenedores
 ./vendor/bin/sail up -d
 
@@ -51,8 +48,8 @@ cp .env.example .env
 ./vendor/bin/sail composer install
 ./vendor/bin/sail artisan key:generate
 
-# ⚡ BASE DE DATOS Y DATOS DE PRUEBA (NUEVO)
-# Este comando crea las tablas y rellena la tienda con productos falsos
+# ⚡ BASE DE DATOS Y DATOS DE PRUEBA
+# Crea las tablas y rellena el catálogo con productos iniciales
 ./vendor/bin/sail artisan migrate:fresh --seed
 ```
 
@@ -75,9 +72,20 @@ npm run dev
 
 ---
 
-## 🔌 API Endpoints Documentados
+## 🏗️ Arquitectura del Carrito (Estado Global)
 
-Actualmente la API expone los siguientes puntos de entrada:
+Se ha implementado una solución de gestión de estado centralizada mediante **React Context API** (`CartContext.jsx`). 
+
+
+
+### Capacidades del Sistema:
+* **Persistencia en Sesión:** El carrito mantiene los productos mientras el usuario navega por la SPA.
+* **Lógica de Negocio:** Manejo automático de cantidades duplicadas, eliminación de ítems y cálculo dinámico de subtotales.
+* **Interfaz Reactiva:** Un componente `CartSidebar` que utiliza transiciones de Tailwind CSS para una experiencia fluida.
+
+---
+
+## 🔌 API Endpoints Documentados
 
 | Método | Endpoint | Descripción | Acceso |
 | :--- | :--- | :--- | :--- |
@@ -89,8 +97,6 @@ Actualmente la API expone los siguientes puntos de entrada:
 ---
 
 ## 🔐 Flujo de Autenticación (OAuth 2.0 + Perfil)
-
-El sistema implementa un flujo híbrido: OAuth para la identidad inicial y Cookies de Sesión para la persistencia.
 
 ```mermaid
 sequenceDiagram
@@ -124,15 +130,13 @@ sequenceDiagram
 ## 💡 Notas Técnicas Importantes
 
 ### Gestión de CORS y Cookies
-Para permitir la comunicación fluida entre `localhost:5173` (Frontend) y `localhost` (Backend):
-* **CORS:** Se ha habilitado `supports_credentials => true` en `config/cors.php`.
-* **Axios:** Se ha configurado `axios.defaults.withCredentials = true` en el frontend.
-* **Resultado:** La cookie de sesión (`laravel_session`) persiste en el navegador.
+Para permitir la comunicación fluida entre dominios cruzados:
+* **CORS:** Habilitado `supports_credentials => true` en el backend.
+* **Axios:** Configurado `withCredentials = true` para enviar cookies de sesión en cada petición.
 
-### Base de Datos (Seeders)
-El proyecto incluye un `DatabaseSeeder` que genera automáticamente:
-* Productos de ejemplo (Laptops, Auriculares, Monitores).
-* Imágenes de placeholder.
+### Base de Datos y Modelos
+* **Modelo Product:** Incluye asignación masiva (`$fillable`) para seguridad.
+* **Seeders:** El sistema genera automáticamente datos realistas para pruebas de UI.
 
 ---
 
@@ -140,10 +144,10 @@ El proyecto incluye un `DatabaseSeeder` que genera automáticamente:
 
 | Fase | Estado | Descripción |
 | :--- | :---: | :--- |
-| **1. Infraestructura & Auth** | ✅ | Docker, React, Laravel, Google Login, Dashboard Usuario. |
-| **2. Catálogo de Productos** | ✅ | Modelos DB, Migraciones, Seeders, API REST, Frontend Grid. |
-| **3. Carrito de Compra** | ⏳ | Gestión de estado (Context API), Lógica de negocio. |
-| **4. Pasarela de Pagos** | ⬜ | Simulación de checkout y pedidos. |
+| **1. Infraestructura & Auth** | ✅ | Docker, React, Laravel, Google Login. |
+| **2. Catálogo de Productos** | ✅ | Modelos DB, Migraciones, Seeders, API REST. |
+| **3. Carrito de Compra** | ✅ | Gestión de estado (Context API), Sidebar UI. |
+| **4. Pasarela de Pagos** | ⏳ | Simulación de checkout y flujo de pedidos. |
 
 ---
 **Autor:** Ángel - Desarrollador Full Stack Junior
