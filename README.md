@@ -16,9 +16,9 @@ El proyecto integra una API RESTful robusta en Laravel con una interfaz de usuar
 ### Frontend (SPA)
 * **Framework:** React 18
 * **Estado Global:** React Context API (Gestión de Carrito y UI).
+* **Persistencia:** LocalStorage (Sincronización de carrito).
 * **Build Tool:** Vite.
 * **Estilos:** Tailwind CSS v3.4.
-* **Routing:** React Router DOM v6.
 * **HTTP Client:** Axios (Configurado con `withCredentials = true`).
 
 ### Infraestructura (DevSecOps)
@@ -74,14 +74,12 @@ npm run dev
 
 ## 🏗️ Arquitectura del Carrito (Estado Global)
 
-Se ha implementado una solución de gestión de estado centralizada mediante **React Context API** (`CartContext.jsx`). 
-
-
+Se ha implementado una solución de gestión de estado centralizada mediante **React Context API** (`CartContext.jsx`) con persistencia local.
 
 ### Capacidades del Sistema:
-* **Persistencia en Sesión:** El carrito mantiene los productos mientras el usuario navega por la SPA.
+* **Persistencia Híbrida:** El carrito se sincroniza con `LocalStorage` para sobrevivir a recargas de página o cierres de navegador.
 * **Lógica de Negocio:** Manejo automático de cantidades duplicadas, eliminación de ítems y cálculo dinámico de subtotales.
-* **Interfaz Reactiva:** Un componente `CartSidebar` que utiliza transiciones de Tailwind CSS para una experiencia fluida.
+* **UI Reactiva:** Sidebar lateral deslizante y contadores en tiempo real.
 
 ---
 
@@ -93,6 +91,7 @@ Se ha implementado una solución de gestión de estado centralizada mediante **R
 | `GET` | `/auth/google/redirect` | Inicia flujo OAuth con Google | 🌍 Público |
 | `GET` | `/api/user` | Obtener perfil del usuario (JSON) | 🔐 Privado (Auth) |
 | `GET` | `/api/products` | Catálogo completo de productos | 🌍 Público |
+| `GET` | `/logout` | Cierre de sesión y limpieza de cookies | 🔐 Privado |
 
 ---
 
@@ -115,14 +114,13 @@ sequenceDiagram
     Google->>BE: Callback a /auth/google/callback
     BE->>DB: Find or Create User (Upsert)
     BE->>BE: Generar Sesión (Cookie)
-    BE->>FE: Redirección final a /dashboard
+    BE->>FE: Redirección final a / (Home)
 
-    Note over User, DB: Fase 2: Obtención de Perfil (API)
-    FE->>FE: Carga Dashboard.jsx
+    Note over User, DB: Fase 2: Persistencia y UI
+    FE->>FE: Carga App.jsx
     FE->>BE: GET /api/user (Incluye Cookie)
-    BE->>BE: Validar Sesión (Auth Middleware)
-    BE-->>FE: JSON { name, email, id ... }
-    FE->>User: Muestra "Hola, [Nombre]"
+    BE-->>FE: JSON { name, email ... }
+    FE->>User: Renderiza "Hola, [Nombre]" + Productos
 ```
 
 ---
@@ -134,6 +132,9 @@ Para permitir la comunicación fluida entre dominios cruzados:
 * **CORS:** Habilitado `supports_credentials => true` en el backend.
 * **Axios:** Configurado `withCredentials = true` para enviar cookies de sesión en cada petición.
 
+### Estrategia de Logout (Hard Redirect)
+Para garantizar la destrucción total de la sesión `HttpOnly`, se utiliza una redirección física (`window.location.href`) hacia el endpoint `/logout` de Laravel. Esto fuerza al navegador a limpiar las cookies de sesión y evita estados inconsistentes en el cliente (SPA).
+
 ### Base de Datos y Modelos
 * **Modelo Product:** Incluye asignación masiva (`$fillable`) para seguridad.
 * **Seeders:** El sistema genera automáticamente datos realistas para pruebas de UI.
@@ -144,10 +145,10 @@ Para permitir la comunicación fluida entre dominios cruzados:
 
 | Fase | Estado | Descripción |
 | :--- | :---: | :--- |
-| **1. Infraestructura & Auth** | ✅ | Docker, React, Laravel, Google Login. |
+| **1. Infraestructura & Auth** | ✅ | Docker, React, Laravel, Google Login, Logout Seguro. |
 | **2. Catálogo de Productos** | ✅ | Modelos DB, Migraciones, Seeders, API REST. |
-| **3. Carrito de Compra** | ✅ | Gestión de estado (Context API), Sidebar UI. |
-| **4. Pasarela de Pagos** | ⏳ | Simulación de checkout y flujo de pedidos. |
+| **3. Carrito de Compra** | ✅ | Context API, LocalStorage, Sidebar UI. |
+| **4. Pasarela de Pagos** | ⏳ | Simulación de checkout y creación de pedidos (Orders). |
 
 ---
 **Autor:** Ángel - Desarrollador Full Stack Junior
