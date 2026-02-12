@@ -2,67 +2,59 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreOrderRequest; // <--- Importante: Usamos nuestra nueva clase
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Product;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+// use Illuminate\Http\Request; // <--- Ya no necesitamos esta clase genérica
 
 class OrderController extends Controller
 {
-    public function store(Request $request)
+    public function store(StoreOrderRequest $request)
     {
-        // 1. Validar que nos envíen productos
-        $request->validate([
-            'products' => 'required|array|min:1',
-            'products.*.id' => 'required|exists:products,id',
-            'products.*.quantity' => 'required|integer|min:1',
-        ]);
+        // 1. Obtener datos ya validados y seguros
+        $validated = $request->validated();
 
-        try {
-            // INICIO DE LA TRANSACCIÓN (Seguridad total)
-            return DB::transaction(function () use ($request) {
+        // 2. Transacción ACID (Todo o nada)
+        return DB::transaction(function () use ($request, $validated) {
+            
+            // A. Cabecera del pedido
+            $order = Order::create([
+                'user_id' => $request->user()->id,
+                'status'  => 'pending',
+                'total'   => 0, // Se calcula abajo
+            ]);
+
+            $totalAmount = 0;
+
+            // B. Detalles del pedido
+            foreach ($validated['products'] as $item) {
+                // Buscamos precio real en BBDD (Seguridad de Precios)
+                $product = Product::find($item['id']); 
                 
-                $total = 0;
-                $user = Auth::user();
+                // Nota: Usamos find() seguro porque la validación 'exists' ya garantizó que existe.
+                
+                $subtotal = $product->price * $item['quantity'];
 
-                // 2. Crear el Pedido (inicialmente con total 0)
-                $order = Order::create([
-                    'user_id' => $user->id,
-                    'total' => 0,
-                    'status' => 'pending'
+                OrderItem::create([
+                    'order_id'   => $order->id,
+                    'product_id' => $product->id,
+                    'quantity'   => $item['quantity'],
+                    'price'      => $product->price, // Congelamos el precio histórico
                 ]);
 
-                // 3. Procesar cada producto del carrito
-                foreach ($request->products as $item) {
-                    // Buscamos el producto real en la BBDD para obtener su precio actual
-                    // (Nunca confíes en el precio que te manda el frontend, ¡te pueden robar!)
-                    $product = Product::findOrFail($item['id']);
-                    
-                    $subtotal = $product->price * $item['quantity'];
-                    $total += $subtotal;
+                $totalAmount += $subtotal;
+            }
 
-                    // Guardamos el item en la tabla detalle
-                    $order->items()->create([
-                        'product_id' => $product->id,
-                        'quantity' => $item['quantity'],
-                        'price' => $product->price, // Guardamos el precio histórico
-                    ]);
-                }
+            // C. Actualizar total final
+            $order->update(['total' => $totalAmount]);
 
-                // 4. Actualizamos el total final del pedido
-                $order->update(['total' => $total]);
-
-                return response()->json([
-                    'message' => '¡Pedido realizado con éxito!',
-                    'order_id' => $order->id,
-                    'total' => $total
-                ], 201);
-            });
-            // FIN DE LA TRANSACCIÓN
-
-        } catch (\Exception $e) {
-            return response()->json(['error' => 'Error al procesar el pedido: ' . $e->getMessage()], 500);
-        }
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Pedido realizado correctamente',
+                'order_id' => $order->id
+            ], 201);
+        });
     }
 }

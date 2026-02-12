@@ -1,7 +1,12 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
 
-// https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
-})
+    plugins: [react()],
+    server: {
+        host: true, // Importante para que Docker lo vea
+        port: 5173,
+        strictPort: true,
+        // Eliminamos la sección 'proxy' para evitar el error ERR_EMPTY_RESPONSE
+    }
+});

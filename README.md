@@ -33,13 +33,19 @@ Sigue estos pasos para inicializar el entorno de desarrollo desde cero.
 
 ### 1. Inicializar Servicios Backend
 
-El proyecto utiliza Docker para garantizar la paridad de entornos.
+El proyecto utiliza Docker. Es necesario configurar puertos específicos para evitar conflictos con el frontend local.
 
 ```bash
 cd backend
 
 # Configuración de variables de entorno
 cp .env.example .env
+
+# ⚠️ AJUSTES CRÍTICOS EN .ENV (Backend):
+# Asegúrate de configurar estas variables para evitar conflictos de puertos y errores de cookies:
+# VITE_PORT=5174              <-- Libera el puerto 5173 para React
+# SESSION_SECURE_COOKIE=false <-- Permite cookies en HTTP (Localhost)
+# SESSION_SAME_SITE=lax       <-- Permite cookies entre puertos
 
 # Levantar contenedores
 ./vendor/bin/sail up -d
@@ -55,7 +61,7 @@ cp .env.example .env
 
 ### 2. Inicializar Cliente Frontend
 
-En una nueva terminal:
+En una nueva terminal (manteniendo la del backend abierta):
 
 ```bash
 cd frontend
@@ -67,8 +73,8 @@ npm install
 npm run dev
 ```
 
-* **Frontend:** [http://localhost:5173](http://localhost:5173)
-* **API Productos:** [http://localhost/api/products](http://localhost/api/products)
+* **Frontend:** [http://localhost:5173](http://localhost:5173) (Usar este para navegar)
+* **API Backend:** [http://localhost](http://localhost) (Solo devuelve JSON)
 
 ---
 
@@ -171,9 +177,10 @@ sequenceDiagram
 ## 💡 Notas Técnicas Importantes
 
 ### Gestión de CORS y Cookies
-Para permitir la comunicación fluida entre dominios cruzados:
+Para permitir la comunicación fluida entre dominios cruzados (Puerto 5173 vs Puerto 80):
 * **CORS:** Habilitado `supports_credentials => true` en el backend.
 * **Axios:** Configurado `withCredentials = true` para enviar cookies de sesión en cada petición.
+* **Sanctum:** Configurado `SANCTUM_STATEFUL_DOMAINS` para reconocer al frontend.
 
 ### Estrategia de Logout (Hard Redirect)
 Para garantizar la destrucción total de la sesión `HttpOnly`, se utiliza una redirección física (`window.location.href`) hacia el endpoint `/logout` de Laravel. Esto fuerza al navegador a limpiar las cookies de sesión y evita estados inconsistentes en el cliente (SPA).
@@ -190,16 +197,16 @@ El sistema **no confía** en los precios enviados por el frontend. Al procesar u
 
 | Fase | Estado | Descripción |
 | :--- | :---: | :--- |
-| **1. Infraestructura & Auth** | ✅ | Docker, React, Laravel, Google Login, Logout Seguro. |
+| **1. Infraestructura & Auth** | ✅ | Docker (con puertos custom), React, Laravel, Google Login. |
 | **2. Catálogo de Productos** | ✅ | Modelos DB, Migraciones, Seeders, API REST. |
 | **3. Carrito de Compra** | ✅ | Context API, LocalStorage, Sidebar UI. |
-| **4. Gestión de Pedidos** | 🚧 | Base de datos creada y API lista. **En debugging (Error 401)**. |
+| **4. Gestión de Pedidos** | 🚧 | Base de datos y API implementadas. **En depuración (Error 401)**. |
 | **5. Pasarela de Pagos** | ⏳ | Simulación de checkout y flujo de pedidos completo. |
 
 ---
 
 ## 🐛 Problemas Conocidos (WIP)
-* **Error 401 en Checkout:** Actualmente existe un conflicto con la validación CSRF en la ruta POST `/api/orders` que impide finalizar la compra aunque el usuario esté logueado. Pendiente de revisión de configuración `SameSite` en cookies.
+* **Error 401 en Checkout:** Actualmente existe un conflicto con la validación CSRF/SameSite en la ruta POST `/api/orders`. El sistema de autenticación funciona (Login OK), pero el navegador bloquea la cookie de sesión al intentar escribir (POST) debido a políticas de seguridad entre puertos locales. Se está trabajando en el ajuste de `SESSION_SECURE_COOKIE`.
 
 ---
 **Autor:** Ángel - Desarrollador Full Stack Junior
