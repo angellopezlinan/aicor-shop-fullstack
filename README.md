@@ -11,7 +11,7 @@ El proyecto integra una API RESTful robusta en Laravel con una interfaz de usuar
 * **Base de Datos:** MariaDB 11.4
 * **Autenticación:** Laravel Socialite (Google OAuth) + Laravel Sanctum (Session/Cookies).
 * **API:** RESTful JSON.
-* **Configuración:** CORS configurado para aceptar credenciales (`Access-Control-Allow-Credentials`).
+* **Seguridad:** Transacciones DB (ACID) para pedidos, Configuración CORS/CSRF estricta.
 
 ### Frontend (SPA)
 * **Framework:** React 18
@@ -83,6 +83,48 @@ Se ha implementado una solución de gestión de estado centralizada mediante **R
 
 ---
 
+## 🗄️ Modelo de Datos (Base de Datos)
+
+El sistema utiliza una base de datos relacional para gestionar la integridad de los pedidos.
+
+```mermaid
+erDiagram
+    USER ||--o{ ORDER : "realiza"
+    ORDER ||--|{ ORDER_ITEM : "contiene"
+    PRODUCT ||--o{ ORDER_ITEM : "referenciado en"
+
+    USER {
+        bigint id PK
+        string name
+        string email
+    }
+
+    ORDER {
+        bigint id PK
+        bigint user_id FK
+        decimal total
+        string status "pending, paid, shipped"
+        timestamp created_at
+    }
+
+    ORDER_ITEM {
+        bigint id PK
+        bigint order_id FK
+        bigint product_id FK
+        int quantity
+        decimal price "Precio histórico congelado"
+    }
+
+    PRODUCT {
+        bigint id PK
+        string name
+        decimal price
+        int stock
+    }
+```
+
+---
+
 ## 🔌 API Endpoints Documentados
 
 | Método | Endpoint | Descripción | Acceso |
@@ -91,6 +133,7 @@ Se ha implementado una solución de gestión de estado centralizada mediante **R
 | `GET` | `/auth/google/redirect` | Inicia flujo OAuth con Google | 🌍 Público |
 | `GET` | `/api/user` | Obtener perfil del usuario (JSON) | 🔐 Privado (Auth) |
 | `GET` | `/api/products` | Catálogo completo de productos | 🌍 Público |
+| `POST` | `/api/orders` | **Crear nuevo pedido** | 🔐 Privado |
 | `GET` | `/logout` | Cierre de sesión y limpieza de cookies | 🔐 Privado |
 
 ---
@@ -135,9 +178,11 @@ Para permitir la comunicación fluida entre dominios cruzados:
 ### Estrategia de Logout (Hard Redirect)
 Para garantizar la destrucción total de la sesión `HttpOnly`, se utiliza una redirección física (`window.location.href`) hacia el endpoint `/logout` de Laravel. Esto fuerza al navegador a limpiar las cookies de sesión y evita estados inconsistentes en el cliente (SPA).
 
-### Base de Datos y Modelos
-* **Modelo Product:** Incluye asignación masiva (`$fillable`) para seguridad.
-* **Seeders:** El sistema genera automáticamente datos realistas para pruebas de UI.
+### Seguridad en Pedidos (Transacciones)
+El sistema **no confía** en los precios enviados por el frontend. Al procesar un pedido:
+1. Se abre una transacción de base de datos.
+2. Se busca el precio real actual del producto en la BBDD.
+3. Se guarda ese precio histórico en `order_items` (para evitar discrepancias futuras).
 
 ---
 
@@ -148,7 +193,13 @@ Para garantizar la destrucción total de la sesión `HttpOnly`, se utiliza una r
 | **1. Infraestructura & Auth** | ✅ | Docker, React, Laravel, Google Login, Logout Seguro. |
 | **2. Catálogo de Productos** | ✅ | Modelos DB, Migraciones, Seeders, API REST. |
 | **3. Carrito de Compra** | ✅ | Context API, LocalStorage, Sidebar UI. |
-| **4. Pasarela de Pagos** | ⏳ | Simulación de checkout y creación de pedidos (Orders). |
+| **4. Gestión de Pedidos** | 🚧 | Base de datos creada y API lista. **En debugging (Error 401)**. |
+| **5. Pasarela de Pagos** | ⏳ | Simulación de checkout y flujo de pedidos completo. |
+
+---
+
+## 🐛 Problemas Conocidos (WIP)
+* **Error 401 en Checkout:** Actualmente existe un conflicto con la validación CSRF en la ruta POST `/api/orders` que impide finalizar la compra aunque el usuario esté logueado. Pendiente de revisión de configuración `SameSite` en cookies.
 
 ---
 **Autor:** Ángel - Desarrollador Full Stack Junior

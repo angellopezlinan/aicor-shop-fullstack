@@ -4,6 +4,7 @@ import { CartProvider, useCart } from './context/CartContext';
 import ProductList from './components/ProductList';
 import CartSidebar from './components/CartSidebar';
 
+// Configuración global de Axios
 axios.defaults.withCredentials = true;
 
 function Navbar({ user, onLogout }) {
@@ -45,8 +46,18 @@ function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // --- CAMBIO CLAVE AQUÍ ---
   useEffect(() => {
-    checkUser();
+    // 1. Antes de nada, pedimos el token CSRF a Laravel.
+    // Esto configura las cookies de seguridad necesarias para hacer POSTs.
+    axios.get('http://localhost/sanctum/csrf-cookie').then(() => {
+        // 2. Una vez tenemos la seguridad lista, comprobamos el usuario.
+        checkUser();
+    }).catch((error) => {
+        console.error("Error inicializando CSRF:", error);
+        // Si falla, intentamos cargar el usuario de todas formas por si acaso
+        checkUser();
+    });
   }, []);
 
   const checkUser = () => {
@@ -61,14 +72,8 @@ function App() {
       });
   };
 
-  // --- CORRECCIÓN IMPORTANTE AQUÍ ---
-  // Ya no usamos async/await ni axios.
-  // Mandamos al navegador físicamente a la ruta de Laravel.
   const handleLogout = () => {
-    // 1. (Opcional) Si quieres borrar el carrito al salir:
-    // localStorage.removeItem('aicor_cart');
-
-    // 2. Redirección física. Laravel destruirá la sesión y nos devolverá aquí.
+    // Redirección física para destruir la sesión HttpOnly de forma segura
     window.location.href = "http://localhost/logout";
   };
 
