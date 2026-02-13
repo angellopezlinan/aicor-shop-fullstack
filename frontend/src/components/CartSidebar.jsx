@@ -3,21 +3,19 @@ import axios from 'axios';
 import { useCart } from '../context/CartContext';
 
 // ⚙️ CONFIGURACIÓN GLOBAL DE AXIOS PARA ESTE MÓDULO
-// Le decimos a Axios: "Tu casa base es el puerto 80 y SIEMPRE debes llevar las cookies"
 axios.defaults.baseURL = 'http://localhost';
 axios.defaults.withCredentials = true;
 axios.defaults.withXSRFToken = true;
-// Estas cabeceras aseguran que Laravel siempre nos responda en JSON y no intente renderizar HTML
 axios.defaults.headers.common['Accept'] = 'application/json';
 axios.defaults.headers.common['Content-Type'] = 'application/json';
 
 export default function CartSidebar() {
-    const { cart, removeFromCart, clearCart, cartTotal, isCartOpen, setIsCartOpen } = useCart();
+    // 👈 Importamos timeRemaining del contexto
+    const { cart, removeFromCart, clearCart, cartTotal, isCartOpen, setIsCartOpen, timeRemaining } = useCart();
     const [loading, setLoading] = useState(false);
     const [orderSuccess, setOrderSuccess] = useState(null);
     const [errorMessage, setErrorMessage] = useState(null);
 
-    // Si el carrito está cerrado, no renderizamos nada (Optimización de rendimiento)
     if (!isCartOpen) return null;
 
     const handleCheckout = async () => {
@@ -25,7 +23,6 @@ export default function CartSidebar() {
         setOrderSuccess(null);
         setErrorMessage(null);
 
-        // Preparamos la carga útil (Payload)
         const orderPayload = {
             products: cart.map(item => ({
                 id: item.id,
@@ -34,17 +31,10 @@ export default function CartSidebar() {
         };
 
         try {
-            // 1. 🛡️ Handshake CSRF (Petición de vuelo previo)
-            // Gracias a la config global, ya no hay que poner { withCredentials } aquí
             await axios.get('/sanctum/csrf-cookie');
-
-            // 2. 🚀 Mutación de Datos (Data Mutation)
             const response = await axios.post('/api/orders', orderPayload);
-            
-            // 🧹 NUEVO: Le avisamos a Laravel que vacíe la cesta de la Base de Datos
             await axios.post('/api/cart/clear'); 
             
-            // 3. ✅ Actualización de Interfaz (UI Update) tras éxito 200/201
             setOrderSuccess(`¡Pedido #${response.data.order_id || 'confirmado'}! 🎉`);
             
             setTimeout(() => {
@@ -55,9 +45,7 @@ export default function CartSidebar() {
 
         } catch (error) {
             console.error("❌ Error Checkout:", error);
-
             if (error.response) {
-                // Manejo de códigos HTTP específicos
                 if (error.response.status === 401 || error.response.status === 419) {
                     setErrorMessage("Sesión caducada o sin permisos. Por favor, vuelve a iniciar sesión.");
                 } else if (error.response.status === 422) {
@@ -72,6 +60,17 @@ export default function CartSidebar() {
             setLoading(false);
         }
     };
+
+    // ⏱️ FUNCIÓN DE FORMATO DE TIEMPO (Convierte 90s a "01:30")
+    const formatTime = (totalSeconds) => {
+        if (totalSeconds === null) return "00:00";
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    };
+
+    // 🚦 LÓGICA DE ALERTA (Si quedan menos de 2 minutos = 120 segundos)
+    const isTimeRunningOut = timeRemaining !== null && timeRemaining <= 120;
 
     return (
         <div className="relative z-50">
@@ -101,6 +100,28 @@ export default function CartSidebar() {
                             </svg>
                         </button>
                     </div>
+
+                    {/* ⏱️ BANNER DEL TEMPORIZADOR (Solo aparece si hay productos) */}
+                    {cart.length > 0 && timeRemaining !== null && (
+                        <div className={`px-6 py-3 flex items-center justify-center gap-3 transition-colors duration-500 shadow-inner ${
+                            isTimeRunningOut ? 'bg-red-50 border-b border-red-100' : 'bg-indigo-50 border-b border-indigo-100'
+                        }`}>
+                            <svg 
+                                className={`w-6 h-6 ${isTimeRunningOut ? 'text-red-500 animate-pulse' : 'text-indigo-500'}`} 
+                                fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <div className="flex flex-col">
+                                <span className={`text-xs font-bold uppercase tracking-wider ${isTimeRunningOut ? 'text-red-600' : 'text-indigo-600'}`}>
+                                    {isTimeRunningOut ? '¡La reserva expira pronto!' : 'Tiempo de reserva'}
+                                </span>
+                                <span className={`text-xl font-mono font-black ${isTimeRunningOut ? 'text-red-700' : 'text-indigo-900'}`}>
+                                    {formatTime(timeRemaining)}
+                                </span>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Lista de Productos */}
                     <div className="flex-1 overflow-y-auto p-6 bg-white">
