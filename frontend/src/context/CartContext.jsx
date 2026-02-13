@@ -1,49 +1,85 @@
 import { createContext, useState, useContext, useEffect } from 'react';
+import axios from 'axios'; 
 
 const CartContext = createContext();
 
 export const CartProvider = ({ children }) => {
-    // 1. Inicializamos el estado buscando si ya había algo guardado en el navegador
     const [cart, setCart] = useState(() => {
         const savedCart = localStorage.getItem('aicor_cart');
         return savedCart ? JSON.parse(savedCart) : [];
     });
 
-    // Estado para controlar si el panel lateral está abierto o cerrado
     const [isCartOpen, setIsCartOpen] = useState(false); 
 
-    // 2. Cada vez que el carrito cambie, guardamos la copia actualizada en LocalStorage
     useEffect(() => {
         localStorage.setItem('aicor_cart', JSON.stringify(cart));
     }, [cart]);
 
-    // Función para añadir productos
-    const addToCart = (product) => {
+    const fetchCart = async () => {
+        try {
+            // Usamos la URL completa por seguridad
+            const res = await axios.get('http://localhost/api/cart'); 
+            
+            const itemsFromServer = res.data.map(item => ({
+                id: item.product.id,
+                name: item.product.name,
+                price: item.product.price,
+                image_url: item.product.image_url,
+                quantity: item.quantity
+            }));
+            
+            setCart(itemsFromServer);
+        } catch (error) {
+            console.error("Error al recuperar el carrito del servidor:", error);
+        }
+    };
+
+    const addToCart = async (product) => {
+        // 1. Actualizamos la Interfaz de React AL INSTANTE (Optimistic UI)
         setCart((prevCart) => {
-            const existingItem = prevCart.find(item => item.id === product.id);
-            if (existingItem) {
-                // Si ya existe, le sumamos 1 a la cantidad
+            const isExisting = prevCart.find(item => item.id === product.id);
+            if (isExisting) {
                 return prevCart.map(item =>
                     item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
                 );
             }
-            // Si es nuevo, lo añadimos con cantidad 1
             return [...prevCart, { ...product, quantity: 1 }];
         });
-        // Nota: No abrimos el carrito automáticamente aquí (a petición tuya)
+
+        // 2. Calculamos la cantidad para el Backend
+        const currentItem = cart.find(item => item.id === product.id);
+        const quantityToSend = currentItem ? currentItem.quantity + 1 : 1;
+
+        // 3. Avisamos a Laravel en segundo plano
+        try {
+            await axios.post('http://localhost/api/cart', {
+                product_id: product.id,
+                quantity: quantityToSend
+            });
+        } catch (error) {
+            console.error("Error guardando el producto en Laravel:", error);
+            // Aquí en un entorno real revertiríamos el estado si falla, 
+            // pero para esta fase es suficiente con registrar el error.
+        }
     };
 
-    // Función para eliminar un producto por completo
-    const removeFromCart = (productId) => {
+    const removeFromCart = async (productId) => {
+        // Actualizamos UI al instante
         setCart((prevCart) => prevCart.filter(item => item.id !== productId));
+
+        try {
+            await axios.delete(`http://localhost/api/cart/${productId}`);
+        } catch (error) {
+            console.error("Error eliminando el producto de Laravel:", error);
+        }
     };
 
-    // Función opcional para limpiar todo el carrito (útil después de pagar)
     const clearCart = () => {
-        setCart([]);
+        setCart([]); 
+        setIsCartOpen(false); 
+        localStorage.removeItem('aicor_cart'); 
     };
 
-    // Cálculos derivados (se actualizan solos cuando cambia el carrito)
     const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
     const cartTotal = cart.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2);
 
@@ -53,6 +89,7 @@ export const CartProvider = ({ children }) => {
             addToCart, 
             removeFromCart, 
             clearCart,
+            fetchCart, 
             cartCount, 
             cartTotal,
             isCartOpen,

@@ -30,3 +30,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/orders', [OrderController::class, 'store']);
     
 });
+use App\Http\Controllers\Api\CartController;
+
+// ... otras rutas ...
+
+Route::middleware('auth:sanctum')->group(function () {
+    // Rutas para el carrito persistente
+    Route::get('/cart', [CartController::class, 'index']);
+    Route::post('/cart', [CartController::class, 'store']);
+    Route::delete('/cart/{id}', [CartController::class, 'destroy']);
+    Route::post('/cart/clear', [CartController::class, 'clear']);
+});

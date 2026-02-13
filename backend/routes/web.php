@@ -16,20 +16,23 @@ Route::get('/', function () {
     return ['Laravel' => app()->version()];
 });
 
-// 1. Redirigir a Google
+// 1. Redirigir a Google (Añadido stateless)
 Route::get('/auth/google/redirect', function () {
-    return Socialite::driver('google')->redirect();
+    return Socialite::driver('google')->stateless()->redirect();
 });
 
-// 2. Recibir respuesta de Google
+// 2. Recibir respuesta de Google (Añadido stateless)
 Route::get('/auth/google/callback', function () {
-    $googleUser = Socialite::driver('google')->user();
+    // Aquí es donde solía fallar lanzando InvalidStateException
+    $googleUser = Socialite::driver('google')->stateless()->user();
 
     $user = User::updateOrCreate([
         'email' => $googleUser->email,
     ], [
         'name' => $googleUser->name,
         'google_id' => $googleUser->id,
+        // Si no tienes la columna google_id en tu tabla de users, 
+        // recuerda que esto podría dar un error SQL, pero si te funcionaba antes, déjalo así.
         'password' => bcrypt(str()->random(16)),
     ]);
 

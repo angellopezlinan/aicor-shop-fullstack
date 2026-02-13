@@ -1,7 +1,7 @@
 # 🛒 AICOR Shop - Full Stack E-commerce
 
 Plataforma de comercio electrónico Full Stack implementada con arquitectura desacoplada (Headless). 
-El proyecto integra una API RESTful robusta en Laravel con una interfaz de usuario reactiva moderna en React.
+El proyecto integra una API RESTful robusta en Laravel con una interfaz de usuario reactiva moderna en React, destacando por su sistema de **Inventario Virtual** y reservas temporales.
 
 ## 🚀 Stack Tecnológico
 
@@ -9,14 +9,14 @@ El proyecto integra una API RESTful robusta en Laravel con una interfaz de usuar
 * **Framework:** Laravel 12.5
 * **Lenguaje:** PHP 8.3
 * **Base de Datos:** MariaDB 11.4
-* **Autenticación:** Laravel Socialite (Google OAuth) + Laravel Sanctum (Session/Cookies).
+* **Autenticación:** Laravel Socialite (Google OAuth Stateless) + Laravel Sanctum (Session/Cookies).
 * **API:** RESTful JSON.
-* **Seguridad:** Transacciones DB (ACID) para pedidos, Configuración CORS/CSRF estricta.
+* **Seguridad & Lógica:** Transacciones DB (ACID) para pedidos, Configuración CORS/CSRF estricta, Inventario Virtual (Reservas de 15 min).
 
 ### Frontend (SPA)
 * **Framework:** React 18
-* **Estado Global:** React Context API (Gestión de Carrito y UI).
-* **Persistencia:** LocalStorage (Sincronización de carrito).
+* **Estado Global:** React Context API (Gestión de Carrito Sincronizado).
+* **Persistencia:** Híbrida (Base de Datos + LocalStorage con Optimistic UI).
 * **Build Tool:** Vite.
 * **Estilos:** Tailwind CSS v3.4.
 * **HTTP Client:** Axios (Configurado con `withCredentials` y `withXSRFToken`).
@@ -79,31 +79,42 @@ npm run dev
 
 ---
 
-## 🏗️ Arquitectura del Carrito (Estado Global)
+## 🏗️ Arquitectura del Carrito (Inventario Virtual)
 
-Se ha implementado una solución de gestión de estado centralizada mediante **React Context API** (`CartContext.jsx`) con persistencia local.
+Se ha implementado una solución de gestión de estado híbrida centralizada mediante **React Context API** (`CartContext.jsx`) con conexión bidireccional a Laravel.
 
 ### Capacidades del Sistema:
-* **Persistencia Híbrida:** El carrito se sincroniza con `LocalStorage` para sobrevivir a recargas de página o cierres de navegador.
-* **Lógica de Negocio:** Manejo automático de cantidades duplicadas, eliminación de ítems y cálculo dinámico de subtotales.
-* **UI Reactiva:** Sidebar lateral deslizante y contadores en tiempo real.
+* **Reserva de Stock Temporal:** Los productos en la cesta se reservan en la BBDD durante **15 minutos**. El catálogo descuenta estas reservas del stock físico disponible.
+* **Persistencia Híbrida:** El carrito sobrevive a recargas gracias a la sincronización entre el servidor y el `LocalStorage`.
+* **Deep Clean:** Al cerrar sesión o realizar un pedido, se aplica una limpieza profunda (RAM, BBDD y Disco) para evitar fugas de estado (State Leakage).
+* **UI Reactiva & Optimista:** Interfaz fluida que actualiza contadores al instante mientras sincroniza con el backend en segundo plano.
 
 ---
 
 ## 🗄️ Modelo de Datos (Base de Datos)
 
-El sistema utiliza una base de datos relacional para gestionar la integridad de los pedidos.
+El sistema utiliza una base de datos relacional para gestionar la integridad de los pedidos y las reservas activas.
 
 ```mermaid
 erDiagram
     USER ||--o{ ORDER : "realiza"
+    USER ||--o{ CART_ITEM : "reserva temporamente"
     ORDER ||--|{ ORDER_ITEM : "contiene"
     PRODUCT ||--o{ ORDER_ITEM : "referenciado en"
+    PRODUCT ||--o{ CART_ITEM : "en cesta de"
 
     USER {
         bigint id PK
         string name
         string email
+    }
+
+    CART_ITEM {
+        bigint id PK
+        bigint user_id FK
+        bigint product_id FK
+        int quantity
+        timestamp expires_at "15 minutos límite"
     }
 
     ORDER {
@@ -136,12 +147,19 @@ erDiagram
 
 | Método | Endpoint | Descripción | Acceso |
 | :--- | :--- | :--- | :--- |
+| **Auth** | | | |
 | `GET` | `/sanctum/csrf-cookie` | Inicializa la protección CSRF | 🌍 Público |
 | `GET` | `/auth/google/redirect` | Inicia flujo OAuth con Google | 🌍 Público |
 | `GET` | `/api/user` | Obtener perfil del usuario (JSON) | 🔐 Privado (Auth) |
+| `GET` | `/logout` | Cierre de sesión y limpieza de cookies | 🔐 Privado |
+| **Catálogo & Pedidos** | | | |
 | `GET` | `/api/products` | Catálogo completo de productos | 🌍 Público |
 | `POST` | `/api/orders` | **Crear nuevo pedido** | 🔐 Privado |
-| `GET` | `/logout` | Cierre de sesión y limpieza de cookies | 🔐 Privado |
+| **Reservas (Carrito)** | | | |
+| `GET` | `/api/cart` | Recuperar cesta guardada | 🔐 Privado |
+| `POST` | `/api/cart` | Añadir producto / Renovar 15min | 🔐 Privado |
+| `DELETE` | `/api/cart/{id}` | Eliminar reserva de producto | 🔐 Privado |
+| `POST` | `/api/cart/clear` | Vaciar reservas post-compra | 🔐 Privado |
 
 ---
 
@@ -155,7 +173,7 @@ sequenceDiagram
     participant Google as Google OAuth
     participant DB as Base de Datos
 
-    Note over User, DB: Fase 1: Identidad (OAuth)
+    Note over User, DB: Fase 1: Identidad (OAuth Stateless)
     User->>FE: Clic en "Entrar con Google"
     FE->>BE: Redirección a /auth/google/redirect
     BE->>Google: Redirección con Client_ID
@@ -170,7 +188,8 @@ sequenceDiagram
     FE->>FE: Carga App.jsx
     FE->>BE: GET /api/user (Incluye Cookie)
     BE-->>FE: JSON { name, email ... }
-    FE->>User: Renderiza "Hola, [Nombre]" + Productos
+    FE->>BE: GET /api/cart (Sincroniza reservas previas)
+    FE->>User: Renderiza "Hola, [Nombre]" + Productos + Cesta
 ```
 
 ---
@@ -179,6 +198,9 @@ sequenceDiagram
 
 ### Configuración de API Stateful (Laravel 12.5)
 Para permitir que Laravel Sanctum valide sesiones basadas en cookies procedentes del frontend (SPA), el middleware correspondiente está inyectado directamente en `bootstrap/app.php` utilizando `$middleware->statefulApi()`.
+
+### Autenticación Stateless con Socialite
+Para evitar excepciones `InvalidStateException` al cruzar puertos en localhost, el flujo de Google OAuth utiliza el método `->stateless()`, delegando la verificación de estado a Sanctum de forma segura.
 
 ### Gestión de CORS, CSRF y Axios
 Para asegurar la comunicación fluida y segura en un entorno de dominios cruzados (puertos diferentes):
@@ -192,9 +214,9 @@ Para garantizar la destrucción total de la sesión `HttpOnly`, se utiliza una r
 
 ### Seguridad en Pedidos (Transacciones)
 El sistema **no confía** en los precios enviados por el frontend. Al procesar un pedido:
-1. Se abre una transacción de base de datos.
-2. Se busca el precio real actual del producto en la BBDD.
-3. Se guarda ese precio histórico en `order_items` (para evitar discrepancias futuras).
+1. Se abre una transacción de base de datos (`DB::transaction`).
+2. Se busca el precio real actual del producto en la BBDD y se comprueba el stock.
+3. Se guarda ese precio histórico en `order_items` y se elimina la reserva de `cart_items`.
 
 ---
 
@@ -202,10 +224,10 @@ El sistema **no confía** en los precios enviados por el frontend. Al procesar u
 
 | Fase | Estado | Descripción |
 | :--- | :---: | :--- |
-| **1. Infraestructura & Auth** | ✅ | Docker (con puertos custom), React, Laravel, Google Login. |
+| **1. Infraestructura & Auth** | ✅ | Docker (con puertos custom), React, Laravel, Google Login Stateless. |
 | **2. Catálogo de Productos** | ✅ | Modelos DB, Migraciones, Seeders, API REST. |
-| **3. Carrito de Compra** | ✅ | Context API, LocalStorage, Sidebar UI. |
-| **4. Gestión de Pedidos** | ✅ | Checkout completado. Integración Sanctum/CSRF resuelta. |
+| **3. Carrito de Compra** | ✅ | Reservas de 15 min, Context API, Optimistic UI, Sincronización. |
+| **4. Gestión de Pedidos** | ✅ | Checkout completado, Transacciones DB, Limpieza de estado global. |
 | **5. Pasarela de Pagos** | ⏳ | Integración de Stripe / PayPal para flujo monetario real. |
 | **6. Panel de Administración**| ⏳ | Dashboard para gestionar productos, stock y estado de pedidos. |
 

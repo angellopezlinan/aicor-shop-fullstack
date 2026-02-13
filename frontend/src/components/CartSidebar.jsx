@@ -41,6 +41,9 @@ export default function CartSidebar() {
             // 2. 🚀 Mutación de Datos (Data Mutation)
             const response = await axios.post('/api/orders', orderPayload);
             
+            // 🧹 NUEVO: Le avisamos a Laravel que vacíe la cesta de la Base de Datos
+            await axios.post('/api/cart/clear'); 
+            
             // 3. ✅ Actualización de Interfaz (UI Update) tras éxito 200/201
             setOrderSuccess(`¡Pedido #${response.data.order_id || 'confirmado'}! 🎉`);
             
