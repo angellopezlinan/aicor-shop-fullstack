@@ -6,7 +6,7 @@ El proyecto integra una API RESTful robusta en Laravel con una interfaz de usuar
 ## 🚀 Stack Tecnológico
 
 ### Backend (API)
-* **Framework:** Laravel 11
+* **Framework:** Laravel 12.5
 * **Lenguaje:** PHP 8.3
 * **Base de Datos:** MariaDB 11.4
 * **Autenticación:** Laravel Socialite (Google OAuth) + Laravel Sanctum (Session/Cookies).
@@ -19,7 +19,7 @@ El proyecto integra una API RESTful robusta en Laravel con una interfaz de usuar
 * **Persistencia:** LocalStorage (Sincronización de carrito).
 * **Build Tool:** Vite.
 * **Estilos:** Tailwind CSS v3.4.
-* **HTTP Client:** Axios (Configurado con `withCredentials = true`).
+* **HTTP Client:** Axios (Configurado con `withCredentials` y `withXSRFToken`).
 
 ### Infraestructura (DevSecOps)
 * **Contenerización:** Docker & Laravel Sail.
@@ -33,7 +33,7 @@ Sigue estos pasos para inicializar el entorno de desarrollo desde cero.
 
 ### 1. Inicializar Servicios Backend
 
-El proyecto utiliza Docker. Es necesario configurar puertos específicos para evitar conflictos con el frontend local.
+El proyecto utiliza Docker. Es necesario configurar puertos y dominios específicos para evitar conflictos de seguridad (CORS/CSRF) con el frontend local.
 
 ```bash
 cd backend
@@ -42,10 +42,11 @@ cd backend
 cp .env.example .env
 
 # ⚠️ AJUSTES CRÍTICOS EN .ENV (Backend):
-# Asegúrate de configurar estas variables para evitar conflictos de puertos y errores de cookies:
-# VITE_PORT=5174              <-- Libera el puerto 5173 para React
-# SESSION_SECURE_COOKIE=false <-- Permite cookies en HTTP (Localhost)
-# SESSION_SAME_SITE=lax       <-- Permite cookies entre puertos
+# Asegúrate de configurar estas variables para un entorno Localhost fluido:
+# VITE_PORT=5174                        <-- Libera el puerto 5173 para React
+# SESSION_DOMAIN=                       <-- Vacío para que el navegador lo asigne
+# SESSION_SECURE_COOKIE=false           <-- Permite cookies en HTTP (Localhost)
+# SANCTUM_STATEFUL_DOMAINS=localhost:5173,127.0.0.1:5173 <-- Sin http://
 
 # Levantar contenedores
 ./vendor/bin/sail up -d
@@ -174,16 +175,20 @@ sequenceDiagram
 
 ---
 
-## 💡 Notas Técnicas Importantes
+## 💡 Notas Técnicas Importantes (Seguridad y Arquitectura)
 
-### Gestión de CORS y Cookies
-Para permitir la comunicación fluida entre dominios cruzados (Puerto 5173 vs Puerto 80):
-* **CORS:** Habilitado `supports_credentials => true` en el backend.
-* **Axios:** Configurado `withCredentials = true` para enviar cookies de sesión en cada petición.
-* **Sanctum:** Configurado `SANCTUM_STATEFUL_DOMAINS` para reconocer al frontend.
+### Configuración de API Stateful (Laravel 12.5)
+Para permitir que Laravel Sanctum valide sesiones basadas en cookies procedentes del frontend (SPA), el middleware correspondiente está inyectado directamente en `bootstrap/app.php` utilizando `$middleware->statefulApi()`.
+
+### Gestión de CORS, CSRF y Axios
+Para asegurar la comunicación fluida y segura en un entorno de dominios cruzados (puertos diferentes):
+* **Backend:** Habilitado `supports_credentials => true`.
+* **Frontend (Axios):** Requiere configuración estricta global:
+  * `withCredentials = true`: Envía la cookie de sesión (`laravel_session`).
+  * `withXSRFToken = true`: Extrae y devuelve automáticamente el token `XSRF-TOKEN` a Laravel, parcheando restricciones de seguridad recientes (CVE) en clientes HTTP.
 
 ### Estrategia de Logout (Hard Redirect)
-Para garantizar la destrucción total de la sesión `HttpOnly`, se utiliza una redirección física (`window.location.href`) hacia el endpoint `/logout` de Laravel. Esto fuerza al navegador a limpiar las cookies de sesión y evita estados inconsistentes en el cliente (SPA).
+Para garantizar la destrucción total de la sesión `HttpOnly`, se utiliza una redirección física (`window.location.href`) hacia el endpoint `/logout` de Laravel. Esto fuerza al navegador a limpiar las cookies de sesión y evita estados inconsistentes en el cliente.
 
 ### Seguridad en Pedidos (Transacciones)
 El sistema **no confía** en los precios enviados por el frontend. Al procesar un pedido:
@@ -200,13 +205,9 @@ El sistema **no confía** en los precios enviados por el frontend. Al procesar u
 | **1. Infraestructura & Auth** | ✅ | Docker (con puertos custom), React, Laravel, Google Login. |
 | **2. Catálogo de Productos** | ✅ | Modelos DB, Migraciones, Seeders, API REST. |
 | **3. Carrito de Compra** | ✅ | Context API, LocalStorage, Sidebar UI. |
-| **4. Gestión de Pedidos** | 🚧 | Base de datos y API implementadas. **En depuración (Error 401)**. |
-| **5. Pasarela de Pagos** | ⏳ | Simulación de checkout y flujo de pedidos completo. |
-
----
-
-## 🐛 Problemas Conocidos (WIP)
-* **Error 401 en Checkout:** Actualmente existe un conflicto con la validación CSRF/SameSite en la ruta POST `/api/orders`. El sistema de autenticación funciona (Login OK), pero el navegador bloquea la cookie de sesión al intentar escribir (POST) debido a políticas de seguridad entre puertos locales. Se está trabajando en el ajuste de `SESSION_SECURE_COOKIE`.
+| **4. Gestión de Pedidos** | ✅ | Checkout completado. Integración Sanctum/CSRF resuelta. |
+| **5. Pasarela de Pagos** | ⏳ | Integración de Stripe / PayPal para flujo monetario real. |
+| **6. Panel de Administración**| ⏳ | Dashboard para gestionar productos, stock y estado de pedidos. |
 
 ---
 **Autor:** Ángel - Desarrollador Full Stack Junior

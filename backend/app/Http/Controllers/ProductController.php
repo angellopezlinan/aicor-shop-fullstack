@@ -10,6 +10,7 @@ class ProductController extends Controller
     // Este método devuelve la lista completa en formato JSON
     public function index()
     {
+        
         return Product::all();
     }
 }

@@ -2,13 +2,22 @@ import { useState } from 'react';
 import axios from 'axios';
 import { useCart } from '../context/CartContext';
 
+// ⚙️ CONFIGURACIÓN GLOBAL DE AXIOS PARA ESTE MÓDULO
+// Le decimos a Axios: "Tu casa base es el puerto 80 y SIEMPRE debes llevar las cookies"
+axios.defaults.baseURL = 'http://localhost';
+axios.defaults.withCredentials = true;
+axios.defaults.withXSRFToken = true;
+// Estas cabeceras aseguran que Laravel siempre nos responda en JSON y no intente renderizar HTML
+axios.defaults.headers.common['Accept'] = 'application/json';
+axios.defaults.headers.common['Content-Type'] = 'application/json';
+
 export default function CartSidebar() {
     const { cart, removeFromCart, clearCart, cartTotal, isCartOpen, setIsCartOpen } = useCart();
     const [loading, setLoading] = useState(false);
     const [orderSuccess, setOrderSuccess] = useState(null);
     const [errorMessage, setErrorMessage] = useState(null);
 
-    // Si el carrito está cerrado, no renderizamos nada
+    // Si el carrito está cerrado, no renderizamos nada (Optimización de rendimiento)
     if (!isCartOpen) return null;
 
     const handleCheckout = async () => {
@@ -16,6 +25,7 @@ export default function CartSidebar() {
         setOrderSuccess(null);
         setErrorMessage(null);
 
+        // Preparamos la carga útil (Payload)
         const orderPayload = {
             products: cart.map(item => ({
                 id: item.id,
@@ -24,19 +34,15 @@ export default function CartSidebar() {
         };
 
         try {
-            // 1. Handshake (Ruta relativa)
-            await axios.get('http://localhost/sanctum/csrf-cookie', { withCredentials: true });
+            // 1. 🛡️ Handshake CSRF (Petición de vuelo previo)
+            // Gracias a la config global, ya no hay que poner { withCredentials } aquí
+            await axios.get('/sanctum/csrf-cookie');
 
-            // 2. Pedido (Ruta relativa)
-            const response = await axios.post('http://localhost/api/orders', orderPayload, {
-                withCredentials: true,
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json'
-                }
-            });
-            // 3. ÉXITO
-            setOrderSuccess(`¡Pedido #${response.data.order_id} confirmado! 🎉`);
+            // 2. 🚀 Mutación de Datos (Data Mutation)
+            const response = await axios.post('/api/orders', orderPayload);
+            
+            // 3. ✅ Actualización de Interfaz (UI Update) tras éxito 200/201
+            setOrderSuccess(`¡Pedido #${response.data.order_id || 'confirmado'}! 🎉`);
             
             setTimeout(() => {
                 clearCart();
@@ -45,18 +51,19 @@ export default function CartSidebar() {
             }, 3000);
 
         } catch (error) {
-            console.error("Error Checkout:", error);
+            console.error("❌ Error Checkout:", error);
 
             if (error.response) {
+                // Manejo de códigos HTTP específicos
                 if (error.response.status === 401 || error.response.status === 419) {
-                    setErrorMessage("Sesión caducada. Recarga la página.");
+                    setErrorMessage("Sesión caducada o sin permisos. Por favor, vuelve a iniciar sesión.");
                 } else if (error.response.status === 422) {
-                    setErrorMessage("Error de validación en los productos.");
+                    setErrorMessage("Error de validación: Algunos productos ya no están disponibles.");
                 } else {
-                    setErrorMessage("Error del servidor. Inténtalo más tarde.");
+                    setErrorMessage("Error interno del servidor. Inténtalo más tarde.");
                 }
             } else {
-                setErrorMessage("Error de conexión con el servidor.");
+                setErrorMessage("Error de red: No se pudo conectar con el servidor.");
             }
         } finally {
             setLoading(false);
