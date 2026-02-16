@@ -228,7 +228,7 @@ El sistema **no confía** en los precios enviados por el frontend. Al procesar u
 | **2. Catálogo de Productos** | ✅ | Modelos DB, Migraciones, Seeders, API REST. |
 | **3. Carrito de Compra** | ✅ | Reservas de 15 min, Context API, Optimistic UI, Sincronización. |
 | **4. Gestión de Pedidos** | ✅ | Checkout completado, Transacciones DB, Limpieza de estado global. |
-| **5. Pasarela de Pagos** | ⏳ | Integración de Stripe / PayPal para flujo monetario real. |
+| **5. Pasarela de Pagos** | ✅ | Integración de Stripe completada (Pagos, Webhook simulado y BBDD). |
 | **6. Panel de Administración**| ⏳ | Dashboard para gestionar productos, stock y estado de pedidos. |
 
 ---

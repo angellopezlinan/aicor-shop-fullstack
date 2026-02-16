@@ -2,57 +2,66 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\StoreOrderRequest; // <--- Importante: Usamos nuestra nueva clase
+use Illuminate\Http\Request; // 👈 Volvemos a la Request estándar (no hace falta validar entrada externa)
 use App\Models\Order;
 use App\Models\OrderItem;
-use App\Models\Product;
 use Illuminate\Support\Facades\DB;
-// use Illuminate\Http\Request; // <--- Ya no necesitamos esta clase genérica
 
 class OrderController extends Controller
 {
-    public function store(StoreOrderRequest $request)
+    public function store(Request $request)
     {
-        // 1. Obtener datos ya validados y seguros
-        $validated = $request->validated();
+        $user = $request->user();
+
+        // 1. OBTENER DEL CARRITO (Fuente de la verdad)
+        // Recuperamos los ítems que el usuario tiene guardados en la BD.
+        // Usamos 'with' para traer los datos del producto (precio) de golpe y ahorrar consultas.
+        $cartItems = $user->cartItems()->with('product')->get();
+
+        if ($cartItems->isEmpty()) {
+            return response()->json(['message' => 'No hay productos en el carrito para procesar'], 400);
+        }
 
         // 2. Transacción ACID (Todo o nada)
-        return DB::transaction(function () use ($request, $validated) {
+        return DB::transaction(function () use ($user, $cartItems) {
             
             // A. Cabecera del pedido
+            // Lo marcamos como 'paid' porque solo llegamos aquí si Stripe dio el OK
             $order = Order::create([
-                'user_id' => $request->user()->id,
-                'status'  => 'pending',
-                'total'   => 0, // Se calcula abajo
+                'user_id' => $user->id,
+                'status'  => 'paid', 
+                'total'   => 0, // Lo calculamos ahora
             ]);
 
             $totalAmount = 0;
 
-            // B. Detalles del pedido
-            foreach ($validated['products'] as $item) {
-                // Buscamos precio real en BBDD (Seguridad de Precios)
-                $product = Product::find($item['id']); 
-                
-                // Nota: Usamos find() seguro porque la validación 'exists' ya garantizó que existe.
-                
-                $subtotal = $product->price * $item['quantity'];
+            // B. Detalles del pedido (Movemos de Carrito a OrderItem)
+            foreach ($cartItems as $item) {
+                // Calculamos subtotal usando el precio REAL de la base de datos
+                $price = $item->product->price;
+                $quantity = $item->quantity;
+                $subtotal = $price * $quantity;
 
                 OrderItem::create([
                     'order_id'   => $order->id,
-                    'product_id' => $product->id,
-                    'quantity'   => $item['quantity'],
-                    'price'      => $product->price, // Congelamos el precio histórico
+                    'product_id' => $item->product_id,
+                    'quantity'   => $quantity,
+                    'price'      => $price, // Guardamos el precio histórico al que se compró
                 ]);
 
                 $totalAmount += $subtotal;
             }
 
-            // C. Actualizar total final
+            // C. Actualizar total final del pedido
             $order->update(['total' => $totalAmount]);
+
+            // D. ¡IMPORTANTE! VACIAR EL CARRITO
+            // Como ya es un pedido, borramos los items del carrito de la base de datos
+            $user->cartItems()->delete();
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Pedido realizado correctamente',
+                'message' => 'Pedido realizado y carrito vaciado',
                 'order_id' => $order->id
             ], 201);
         });

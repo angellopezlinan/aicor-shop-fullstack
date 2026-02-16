@@ -3,7 +3,9 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ProductController;
-use App\Http\Controllers\OrderController; // <--- 1. Importamos el controlador de Pedidos
+use App\Http\Controllers\OrderController;
+use App\Http\Controllers\Api\CartController;
+use App\Http\Controllers\Api\PaymentController; // <--- IMPORTANTE: Importamos el controlador de pagos
 
 /*
 |--------------------------------------------------------------------------
@@ -25,19 +27,16 @@ Route::middleware('auth:sanctum')->group(function () {
         return $request->user();
     });
 
-    // 3. Crear un Pedido (NUEVA)
-    // Usamos POST porque vamos a guardar información en la base de datos
+    // 3. Crear un Pedido
     Route::post('/orders', [OrderController::class, 'store']);
-    
-});
-use App\Http\Controllers\Api\CartController;
 
-// ... otras rutas ...
-
-Route::middleware('auth:sanctum')->group(function () {
-    // Rutas para el carrito persistente
+    // 4. Gestión del Carrito (Persistencia)
     Route::get('/cart', [CartController::class, 'index']);
     Route::post('/cart', [CartController::class, 'store']);
     Route::delete('/cart/{id}', [CartController::class, 'destroy']);
     Route::post('/cart/clear', [CartController::class, 'clear']);
+
+    // 5. Pasarela de Pagos (Stripe) <-- NUEVA RUTA
+    Route::post('/create-payment-intent', [PaymentController::class, 'createPaymentIntent']);
+    
 });

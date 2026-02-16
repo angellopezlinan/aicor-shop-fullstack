@@ -13,15 +13,20 @@ export const CartProvider = ({ children }) => {
     const [isCartOpen, setIsCartOpen] = useState(false); 
 
     // 2. ⏱️ ESTADOS DEL TEMPORIZADOR
-    // Guardamos la hora exacta en la que caducará la cesta (Timestamp)
     const [expirationTime, setExpirationTime] = useState(() => {
         const savedTime = localStorage.getItem('aicor_cart_timer');
         return savedTime ? parseInt(savedTime) : null;
     });
-    // Guardamos los segundos que faltan para mostrar en pantalla
+    
     const [timeRemaining, setTimeRemaining] = useState(null);
 
-    // 3. Persistencia en LocalStorage (Carrito y Temporizador)
+    // 🔄 HIDRATACIÓN INICIAL (El Fix que faltaba)
+    // Nada más cargar la web, preguntamos al servidor cómo está la cosa.
+    useEffect(() => {
+        fetchCart();
+    }, []);
+
+    // 3. Persistencia LocalStorage (Backup visual)
     useEffect(() => {
         localStorage.setItem('aicor_cart', JSON.stringify(cart));
     }, [cart]);
@@ -37,83 +42,78 @@ export const CartProvider = ({ children }) => {
     // 4. ⏱️ EL MOTOR DEL RELOJ (Heartbeat)
     useEffect(() => {
         let interval;
-
-        // Solo encendemos el reloj si hay artículos y tenemos una fecha de caducidad
         if (cart.length > 0 && expirationTime) {
             interval = setInterval(() => {
                 const now = Date.now();
-                const timeLeft = Math.max(0, Math.floor((expirationTime - now) / 1000)); // Segundos restantes
+                // Calculamos diferencia real contra la hora del servidor, no un contador simple
+                const timeLeft = Math.max(0, Math.floor((expirationTime - now) / 1000));
 
                 setTimeRemaining(timeLeft);
 
-                // 💥 Autodestrucción si llega a 0
                 if (timeLeft === 0) {
                     clearInterval(interval);
                     handleCartExpiration();
                 }
-            }, 1000); // Se ejecuta cada segundo
+            }, 1000);
         } else {
             setTimeRemaining(null);
         }
-
         return () => clearInterval(interval);
     }, [cart.length, expirationTime]);
 
-    /**
-     * 💥 FUNCIÓN DE AUTODESTRUCCIÓN (Expiración)
-     */
     const handleCartExpiration = async () => {
         try {
-            // 1. Vaciamos la base de datos de Laravel
             await axios.post('http://localhost/api/cart/clear');
         } catch (error) {
-            console.error("Error limpiando reservas expiradas en BD:", error);
+            console.error("Error limpiando DB:", error);
         } finally {
-            // 2. Limpiamos el frontend y avisamos al usuario
             clearCart();
-            alert("⏱️ ¡Tu tiempo de reserva ha finalizado! Los artículos han sido liberados para otros clientes.");
+            alert("⏱️ ¡Tiempo agotado! Tus reservas han expirado.");
         }
     };
 
-    /**
-     * 🔄 REINICIO DEL RELOJ (15 Minutos)
-     */
-    const resetTimer = () => {
-        // 15 minutos * 60 segundos * 1000 milisegundos
-        const newTime = Date.now() + 15 * 60 * 1000; 
-        setExpirationTime(newTime);
-    };
-
-    /**
-     * 🔄 RECUPERAR CESTA DE LARAVEL
-     */
+    // 🔄 LÓGICA DE SINCRONIZACIÓN (Aquí está la magia del Viajero en el Tiempo)
     const fetchCart = async () => {
         try {
             const res = await axios.get('http://localhost/api/cart'); 
-            
-            const itemsFromServer = res.data.map(item => ({
-                id: item.product.id,
-                name: item.product.name,
-                price: item.product.price,
-                image_url: item.product.image_url,
-                quantity: item.quantity
-            }));
-            
-            setCart(itemsFromServer);
+            const serverItems = res.data;
 
-            // Si Laravel nos devuelve artículos pero no tenemos reloj, lo iniciamos
-            if (itemsFromServer.length > 0 && !expirationTime) {
-                resetTimer();
+            if (serverItems.length > 0) {
+                // 1. Buscamos la fecha de expiración REAL más lejana en la BBDD
+                // Laravel nos envía 'expires_at' (ej: "2026-02-16T10:45:00.000000Z")
+                const timestamps = serverItems.map(item => new Date(item.expires_at).getTime());
+                const serverExpiration = Math.max(...timestamps);
+
+                // 2. Si la fecha del servidor es futura, sincronizamos el reloj local
+                if (serverExpiration > Date.now()) {
+                    setExpirationTime(serverExpiration);
+                    
+                    // Mapeamos los productos para la vista
+                    const itemsFormatted = serverItems.map(item => ({
+                        id: item.product.id,
+                        name: item.product.name,
+                        price: item.product.price,
+                        image_url: item.product.image_url,
+                        quantity: item.quantity
+                    }));
+                    setCart(itemsFormatted);
+                } else {
+                    // Si el servidor dice que ya caducó (aunque el local diga lo contrario)
+                    handleCartExpiration(); 
+                }
+            } else {
+                // Si el servidor devuelve array vacío, limpiamos todo
+                clearCart();
             }
         } catch (error) {
-            console.error("Error al recuperar el carrito del servidor:", error);
+            console.error("Sync Error:", error);
+            // Si es error de Auth (401), limpiamos silenciosamente
+            if (error.response && error.response.status === 401) clearCart();
         }
     };
 
-    /**
-     * ➕ AÑADIR AL CARRITO
-     */
     const addToCart = async (product) => {
+        // UI Optimista: Actualizamos visualmente al instante
         setCart((prevCart) => {
             const isExisting = prevCart.find(item => item.id === product.id);
             if (isExisting) {
@@ -124,45 +124,48 @@ export const CartProvider = ({ children }) => {
             return [...prevCart, { ...product, quantity: 1 }];
         });
 
-        // ⏱️ ¡AQUÍ ESTÁ LA MAGIA! Cada vez que interactúa, reiniciamos a 15 min
-        resetTimer();
-
+        // Calculamos cantidad real para enviar
         const currentItem = cart.find(item => item.id === product.id);
         const quantityToSend = currentItem ? currentItem.quantity + 1 : 1;
 
         try {
-            await axios.post('http://localhost/api/cart', {
+            // Enviamos a Laravel
+            const res = await axios.post('http://localhost/api/cart', {
                 product_id: product.id,
                 quantity: quantityToSend
             });
+
+            // ⚡ CLAVE: Usamos la fecha que nos devuelve Laravel en la respuesta
+            // Así garantizamos que backend y frontend tienen el mismo milisegundo de fin
+            if (res.data.item && res.data.item.expires_at) {
+                const newServerTime = new Date(res.data.item.expires_at).getTime();
+                setExpirationTime(newServerTime);
+            }
+
         } catch (error) {
-            console.error("Error guardando el producto en Laravel:", error);
+            console.error("Error add cart:", error);
+            // Si falla, podrías revertir el estado optimista aquí (Rollback)
         }
     };
 
-    /**
-     * ➖ ELIMINAR DEL CARRITO
-     */
     const removeFromCart = async (productId) => {
         setCart((prevCart) => prevCart.filter(item => item.id !== productId));
         
-        // ⏱️ Si borra algo pero aún quedan cosas, le damos 15 min de nuevo por seguir activo
-        resetTimer();
-
         try {
             await axios.delete(`http://localhost/api/cart/${productId}`);
+            // Al borrar, idealmente deberíamos re-sincronizar el tiempo o dejarlo correr
+            // Si quieres reiniciar a 15 min al borrar (actividad de usuario), 
+            // deberías hacer un fetchCart() o que el delete devuelva el nuevo tiempo.
+            // Por simplicidad, dejamos que el tiempo siga corriendo.
         } catch (error) {
-            console.error("Error eliminando el producto de Laravel:", error);
+            console.error("Error delete:", error);
         }
     };
 
-    /**
-     * 🧹 LIMPIEZA PROFUNDA
-     */
     const clearCart = () => {
         setCart([]); 
         setIsCartOpen(false); 
-        setExpirationTime(null); // Apagamos el reloj
+        setExpirationTime(null); 
         setTimeRemaining(null);
         localStorage.removeItem('aicor_cart'); 
         localStorage.removeItem('aicor_cart_timer'); 
@@ -182,7 +185,7 @@ export const CartProvider = ({ children }) => {
             cartTotal,
             isCartOpen,
             setIsCartOpen,
-            timeRemaining // 👈 Exportamos los segundos para que el Sidebar los pinte
+            timeRemaining 
         }}>
             {children}
         </CartContext.Provider>

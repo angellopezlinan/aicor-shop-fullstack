@@ -1,25 +1,27 @@
 import { useState, useEffect } from 'react';
+import { Routes, Route, Link } from 'react-router-dom';
 import axios from 'axios';
 import { useCart } from './context/CartContext';
 import ProductList from './components/ProductList';
 import CartSidebar from './components/CartSidebar';
+import Checkout from './pages/Checkout';
 
 // Configuración global de Axios
 axios.defaults.withCredentials = true;
-axios.defaults.withXSRFToken = true; // 🛡️ Evita errores 419 en el futuro
+axios.defaults.withXSRFToken = true;
 
+// 1. Componente Navbar
 function Navbar({ user, onLogout }) {
   const { cartCount, setIsCartOpen } = useCart();
   
   return (
     <header className="bg-white shadow-sm sticky top-0 z-20">
       <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-indigo-600 flex items-center gap-2">
+        <Link to="/" className="text-2xl font-bold text-indigo-600 flex items-center gap-2 hover:text-indigo-800 transition">
            <span>🛒</span> AICOR Shop
-        </h1>
+        </Link>
         
         <div className="flex items-center gap-4">
-          {/* 🛡️ Solo mostramos controles si el usuario está autenticado */}
           {user ? (
             <>
               <div className="flex items-center gap-3">
@@ -34,12 +36,14 @@ function Navbar({ user, onLogout }) {
 
               <button 
                 onClick={() => setIsCartOpen(true)}
-                className="flex items-center bg-indigo-50 px-4 py-2 rounded-full hover:bg-indigo-100 transition-colors border border-indigo-100"
+                className="flex items-center gap-2 bg-indigo-50 px-4 py-2 rounded-full hover:bg-indigo-100 transition-colors border border-indigo-100"
               >
-                <span className="text-indigo-700 font-medium mr-2">Cesta</span>
-                <span className="bg-indigo-600 text-white text-xs font-bold px-2 py-1 rounded-full">
-                  {cartCount}
-                </span>
+                <span className="text-indigo-700 font-medium">Cesta</span>
+                {cartCount > 0 && (
+                  <span className="bg-indigo-600 text-white text-xs font-bold px-2 py-1 rounded-full">
+                    {cartCount}
+                  </span>
+                )}
               </button>
             </>
           ) : (
@@ -51,10 +55,11 @@ function Navbar({ user, onLogout }) {
   );
 }
 
+// 2. Componente Principal (Renombrado de AppContent a App)
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const { clearCart, fetchCart } = useCart(); // 👈 Obtenemos la sincronización
+  const { clearCart, fetchCart } = useCart(); 
 
   useEffect(() => {
     axios.get('http://localhost/sanctum/csrf-cookie').then(() => {
@@ -69,8 +74,7 @@ function App() {
     axios.get('http://localhost/api/user')
       .then(res => {
         setUser(res.data);
-        // 🚀 PASO CLAVE: Si hay usuario, pedimos su cesta a Laravel
-        fetchCart();
+        fetchCart(); 
         setLoading(false);
       })
       .catch(() => {
@@ -80,7 +84,6 @@ function App() {
   };
 
   const handleLogout = () => {
-    // 🧹 Limpiamos localmente antes de la redirección física
     clearCart();
     window.location.href = "http://localhost/logout";
   };
@@ -95,44 +98,66 @@ function App() {
     <div className="min-h-screen bg-gray-50 font-sans">
       <Navbar user={user} onLogout={handleLogout} />
       
-      {/* 🛡️ El Sidebar solo se monta si hay usuario. Al salir, desaparece del DOM */}
       {user && <CartSidebar />}
       
       <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
-        {user ? (
-          <>
-            <div className="bg-white rounded-2xl p-8 mb-8 shadow-sm border border-indigo-50 flex items-center justify-between">
-              <div>
-                <h2 className="text-3xl font-bold text-gray-900">
-                  ¡Hola de nuevo, {user.name.split(' ')[0]}! 👋
-                </h2>
-                <p className="text-gray-500 mt-2">
-                  Tus productos reservados están a salvo (15 min).
-                </p>
-              </div>
-              <div className="hidden sm:block text-5xl">🚀</div>
+        <Routes>
+          <Route path="/" element={
+            user ? (
+              <>
+                <div className="bg-white rounded-2xl p-8 mb-8 shadow-sm border border-indigo-50 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-3xl font-bold text-gray-900">
+                      ¡Hola de nuevo, {user.name.split(' ')[0]}! 👋
+                    </h2>
+                    <p className="text-gray-500 mt-2">
+                      Tus productos reservados están a salvo (15 min).
+                    </p>
+                  </div>
+                  <div className="hidden sm:block text-5xl">🚀</div>
+                </div>
+                <ProductList />
+              </>
+            ) : (
+              <LoginScreen />
+            )
+          } />
+
+          <Route path="/checkout" element={
+            user ? <Checkout /> : <LoginScreen />
+          } />
+          
+          <Route path="/order-confirmation" element={
+            <div className="text-center py-20">
+              <h2 className="text-3xl font-bold text-green-600">¡Pedido Confirmado! 🎉</h2>
+              <p className="mt-4">Gracias por tu compra.</p>
+              <Link to="/" className="mt-8 inline-block text-indigo-600 underline">Volver a la tienda</Link>
             </div>
-            <ProductList />
-          </>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl shadow-xl border border-gray-100">
-            <div className="text-6xl mb-6">🏪</div>
-            <h2 className="text-3xl font-extrabold text-gray-900 mb-2 text-center">
-              Tu tienda favorita te espera
-            </h2>
-            <p className="text-gray-500 mb-8 text-center max-w-md">
-              Inicia sesión para descubrir productos exclusivos y gestionar tu carrito.
-            </p>
-            <a 
-              href="http://localhost/auth/google/redirect"
-              className="flex items-center gap-3 bg-white border border-gray-300 px-8 py-4 rounded-xl font-bold text-gray-700 shadow-md hover:shadow-lg hover:bg-gray-50 transition-all active:scale-95"
-            >
-              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-6 h-6" />
-              Continuar con Google
-            </a>
-          </div>
-        )}
+          } />
+        </Routes>
       </main>
+    </div>
+  );
+}
+
+// 3. Pantalla de Login
+function LoginScreen() {
+  return (
+    <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl shadow-xl border border-gray-100">
+      <div className="text-6xl mb-6">🏪</div>
+      <h2 className="text-3xl font-extrabold text-gray-900 mb-2 text-center">
+        Tu tienda favorita te espera
+      </h2>
+      <p className="text-gray-500 mb-8 text-center max-w-md">
+        Inicia sesión para descubrir productos exclusivos y gestionar tu carrito.
+      </p>
+      <a 
+        href="http://localhost/auth/google/redirect"
+        className="flex items-center gap-3 bg-white border border-gray-300 px-8 py-4 rounded-xl font-bold text-gray-700 shadow-md hover:shadow-lg hover:bg-gray-50 transition-all active:scale-95"
+      >
+        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-6 h-6" />
+        Continuar con Google
+      </a>
     </div>
   );
 }
