@@ -5,6 +5,7 @@ import { useCart } from './context/CartContext';
 import ProductList from './components/ProductList';
 import CartSidebar from './components/CartSidebar';
 import Checkout from './pages/Checkout';
+import Dashboard from './Dashboard'; // O el nombre que tenga tu archivo del panel
 
 // Configuración global de Axios
 axios.defaults.withCredentials = true;
@@ -26,6 +27,17 @@ function Navbar({ user, onLogout }) {
             <>
               <div className="flex items-center gap-3">
                 <span className="text-sm text-gray-500 hidden md:block">Hola, {user.name}</span>
+                
+                {/* 🛡️ BOTÓN NUEVO: Solo aparece si el usuario es Admin */}
+                {(user.is_admin === 1 || user.is_admin === true) && (
+                  <Link 
+                    to="/dashboard" 
+                    className="text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 px-3 py-1 rounded-full transition border border-indigo-100"
+                  >
+                    ⚙️ Dashboard
+                  </Link>
+                )}
+
                 <button 
                   onClick={onLogout}
                   className="text-xs font-semibold text-red-500 hover:text-red-700 bg-red-50 px-3 py-1 rounded-full transition"
@@ -102,6 +114,7 @@ function App() {
       
       <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <Routes>
+          {/* 🏠 INICIO */}
           <Route path="/" element={
             user ? (
               <>
@@ -123,10 +136,21 @@ function App() {
             )
           } />
 
+          {/* ⚙️ DASHBOARD (Solo Administradores) */}
+          <Route path="/dashboard" element={
+            user && (user.is_admin === 1 || user.is_admin === true) ? (
+              <Dashboard />
+            ) : (
+              <LoginScreen />
+            )
+          } />
+
+          {/* 💳 CHECKOUT */}
           <Route path="/checkout" element={
             user ? <Checkout /> : <LoginScreen />
           } />
           
+          {/* 🎉 CONFIRMACIÓN */}
           <Route path="/order-confirmation" element={
             <div className="text-center py-20">
               <h2 className="text-3xl font-bold text-green-600">¡Pedido Confirmado! 🎉</h2>
@@ -138,7 +162,7 @@ function App() {
       </main>
     </div>
   );
-}
+} // <--- Esta llave cierra la función App
 
 // 3. Pantalla de Login
 function LoginScreen() {

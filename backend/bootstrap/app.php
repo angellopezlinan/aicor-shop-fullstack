@@ -11,10 +11,12 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
-    ->withMiddleware(function (Middleware $middleware): void {
-        // 🛡️ Activamos el modo Stateful para que Sanctum lea las cookies del Frontend
-        $middleware->statefulApi();
-    })
-    ->withExceptions(function (Exceptions $exceptions): void {
+->withMiddleware(function (Middleware $middleware) {
+        $middleware->statefulApi(); // 👈 Esto es VITAL en Laravel 12 para SPAs    
+        $middleware->alias([
+            'admin' => \App\Http\Middleware\AdminMiddleware::class,
+        ]);
+    }) // 👈 Aquí se cierra correctamente el bloque de middleware
+    ->withExceptions(function (Exceptions $exceptions) {
         //
     })->create();

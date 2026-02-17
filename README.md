@@ -80,6 +80,12 @@ erDiagram
         int quantity
         timestamp expires_at
     }
+    ORDER {
+        bigint id PK
+        string status
+        decimal total
+        string stripe_id
+    }
 ```
 
 ---

@@ -13,41 +13,40 @@ use App\Http\Controllers\Api\PaymentController;
 |--------------------------------------------------------------------------
 */
 
-// --- RUTAS PÚBLICAS (Cualquiera puede verlas) ---
-
-// 1. Catálogo de Productos
+// --- 🌍 1. RUTAS PÚBLICAS (Cualquiera) ---
 Route::get('/products', [ProductController::class, 'index']);
-Route::get('/products/{id}', [ProductController::class, 'show']); // 👈 NUEVA: Ver detalle de producto
+Route::get('/products/{id}', [ProductController::class, 'show']);
 
-
-// --- RUTAS PROTEGIDAS (Solo usuarios logueados) ---
+// --- 🔐 2. RUTAS PROTEGIDAS (Solo usuarios logueados) ---
 Route::middleware('auth:sanctum')->group(function () {
 
-    // 2. Obtener Usuario Actual
+    // Perfil y Sesión
     Route::get('/user', function (Request $request) {
         return $request->user();
     });
 
-    // 3. Crear un Pedido
-    Route::post('/orders', [OrderController::class, 'store']);
-
-    // 4. Listar todos los pedidos (Para el Dashboard y el Historial)
-    Route::get('/orders', [OrderController::class, 'index']);
-
-    // 5. Gestión del Carrito (Persistencia)
+    // Carrito (Cada usuario gestiona el suyo)
     Route::get('/cart', [CartController::class, 'index']);
     Route::post('/cart', [CartController::class, 'store']);
     Route::put('/cart/{id}', [CartController::class, 'update']);
     Route::delete('/cart/{id}', [CartController::class, 'destroy']);
     Route::post('/cart/clear', [CartController::class, 'clear']);
 
-    // 6. Pasarela de Pagos (Stripe)
+    // Compras
     Route::post('/create-payment-intent', [PaymentController::class, 'createPaymentIntent']);
+    Route::post('/orders', [OrderController::class, 'store']); // Crear pedido tras pagar
 
-    // 7. GESTIÓN DE PRODUCTOS (ADMINISTRACIÓN) 👈 NUEVO BLOQUE
-    // Estas rutas permiten modificar el catálogo desde el Dashboard
-    Route::post('/products', [ProductController::class, 'store']);       // Crear
-    Route::put('/products/{id}', [ProductController::class, 'update']);  // Editar
-    Route::delete('/products/{id}', [ProductController::class, 'destroy']); // Borrar
+    // --- 🛡️ 3. RUTAS DE ADMINISTRADOR (Solo is_admin = true) ---
+    Route::middleware(['admin'])->group(function () {
+        
+        // Ver historial global de ventas en el Dashboard
+        Route::get('/orders', [OrderController::class, 'index']);
+
+        // CRUD completo de productos
+        Route::post('/products', [ProductController::class, 'store']);
+        Route::put('/products/{id}', [ProductController::class, 'update']);
+        Route::delete('/products/{id}', [ProductController::class, 'destroy']);
+        
+    });
 
 });
