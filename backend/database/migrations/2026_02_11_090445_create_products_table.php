@@ -25,7 +25,8 @@ return new class extends Migration
             $table->integer('stock')->default(0); 
             
             // Multimedia
-            $table->string('image_url')->nullable(); 
+            // 👇 AQUÍ ESTABA EL FALLO: Lo hemos cambiado de 'image_url' a 'image'
+            $table->string('image')->nullable(); 
             
             $table->timestamps();
         });

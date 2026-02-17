@@ -9,8 +9,9 @@ El proyecto integra una API RESTful robusta en Laravel con una interfaz de usuar
 * **Framework:** Laravel 12.5
 * **Lenguaje:** PHP 8.3
 * **Base de Datos:** MariaDB 11.4
+* **Testing:** PHPUnit (Feature & Unit Tests).
 * **Autenticación:** Laravel Socialite (Google OAuth Stateless) + Laravel Sanctum (Session/Cookies).
-* **Seguridad & Lógica:** Transacciones DB (ACID) para pedidos, Control de concurrencia de Stock, Configuración CORS/CSRF estricta, Inventario Virtual (Reservas de 15 min).
+* **Seguridad & Lógica:** Transacciones DB (ACID) para pedidos, Control de concurrencia de Stock, Configuración CORS/CSRF estricta.
 
 ### Frontend (SPA)
 * **Framework:** React 18
@@ -22,6 +23,7 @@ El proyecto integra una API RESTful robusta en Laravel con una interfaz de usuar
 
 ### Infraestructura (DevSecOps)
 * **Contenerización:** Docker & Laravel Sail.
+* **CI/CD:** GitHub Actions (Pipeline de ejecución automática de tests).
 * **Arquitectura:** Soporte nativo para ARM64 (Apple Silicon) y AMD64.
 
 ---
@@ -39,7 +41,14 @@ cp .env.example .env
 ./vendor/bin/sail artisan migrate:fresh --seed
 ```
 
-### 2. Inicializar Cliente Frontend
+### 2. Ejecutar Suite de Tests (Opcional pero Recomendado)
+Para verificar la integridad del sistema y la lógica de negocio:
+```bash
+# Ejecuta tests unitarios y de integración en base de datos en memoria (SQLite)
+./vendor/bin/sail artisan test
+```
+
+### 3. Inicializar Cliente Frontend
 ```bash
 cd frontend
 npm install
@@ -55,6 +64,17 @@ El sistema implementa una **Defensa en Profundidad** para evitar el *overselling
 1. **Frontend (Sidebar/Cart):** Validación visual que bloquea el botón "+" si se alcanza el stock máximo disponible en la BBDD.
 2. **Backend (Pre-pago):** Antes de generar el `PaymentIntent` de Stripe, se verifica de nuevo el almacén.
 3. **Backend (Post-pago):** El `OrderController` ejecuta una **transacción ACID** que valida el stock y aplica un `decrement('stock')` atómico al confirmar la compra.
+
+---
+
+## 🛡️ Calidad de Software & Testing (CI/CD)
+
+El proyecto cuenta con una pipeline de integración continua configurada en **GitHub Actions** que impide la subida de código defectuoso a la rama principal.
+
+### Estrategia de Pruebas (TDD)
+* **Unit Tests:** Verificación aislada de lógica de negocio (ej. cálculo de stock disponible en el Modelo `Product`).
+* **Feature Tests:** Validación de endpoints API (`GET /products`, flujo de datos JSON, códigos de respuesta HTTP).
+* **Database Testing:** Uso de `RefreshDatabase` y SQLite en memoria para garantizar entornos de prueba prístinos.
 
 ---
 
@@ -110,19 +130,6 @@ erDiagram
 
 ---
 
-## 💡 Notas Técnicas Críticas
-
-### Idempotencia y React StrictMode
-Se utiliza un `useRef` en la confirmación del pedido para evitar que el doble renderizado de desarrollo de React genere pedidos duplicados en la base de datos.
-
-### Gestión de Datos Anidados
-El carrito ha evolucionado a una estructura anidada (`item.product.price`) para mantener la integridad de la relación Eloquent. Esto permite que el Frontend siempre tenga acceso al stock actualizado en tiempo real del producto asociado a la línea del carrito.
-
-### Dashboard CMS
-El panel de administración utiliza un sistema de estados reactivos para alternar entre la gestión de **Pedidos** (vista financiera) e **Inventario** (gestión CRUD), permitiendo la actualización del catálogo sin necesidad de herramientas externas de base de datos.
-
----
-
 ## 📅 Hoja de Ruta del Proyecto
 
 | Fase | Estado | Descripción |
@@ -133,6 +140,7 @@ El panel de administración utiliza un sistema de estados reactivos para alterna
 | **4. Gestión de Pedidos** | ✅ | Transacciones DB y reducción de stock atómica. |
 | **5. Pasarela de Pagos** | ✅ | Integración de Stripe (SCA Ready). |
 | **6. Panel de Administración**| ✅ | Dashboard integral con CRUD de productos y detalle de pedidos. |
+| **7. QA & CI/CD** | ✅ | Tests Unitarios/Feature y Pipeline de GitHub Actions. |
 
 ---
 **Autor:** Ángel - Desarrollador Full Stack Junior

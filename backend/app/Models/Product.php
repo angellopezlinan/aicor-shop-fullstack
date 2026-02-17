@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany; // 👈 Importante para las relaciones
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Product extends Model
 {
@@ -15,7 +15,7 @@ class Product extends Model
         'description',
         'price',
         'stock',
-        'image_url',
+        'image', // 👈 Corregido: Debe ser 'image' para coincidir con tu migración y tests
     ];
 
     /**
@@ -37,5 +37,13 @@ class Product extends Model
             ->sum('quantity');
 
         return max(0, $this->stock - $reserved);
+    }
+
+    /**
+     * Comprueba si hay suficiente stock para la cantidad solicitada
+     */
+    public function hasEnoughStock(int $quantity): bool
+    {
+        return $this->stock >= $quantity;
     }
 }
