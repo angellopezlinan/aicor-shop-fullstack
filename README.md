@@ -154,6 +154,7 @@ erDiagram
 | `GET` | `/logout` | Cierre de sesión y limpieza de cookies | 🔐 Privado |
 | **Catálogo & Pedidos** | | | |
 | `GET` | `/api/products` | Catálogo completo de productos | 🌍 Público |
+| `GET` | `/api/orders` | Historial de pedidos (Dashboard) | 🔐 Privado |
 | `POST` | `/api/orders` | **Crear nuevo pedido** | 🔐 Privado |
 | **Reservas (Carrito)** | | | |
 | `GET` | `/api/cart` | Recuperar cesta guardada | 🔐 Privado |
@@ -202,15 +203,15 @@ Para permitir que Laravel Sanctum valide sesiones basadas en cookies procedentes
 ### Autenticación Stateless con Socialite
 Para evitar excepciones `InvalidStateException` al cruzar puertos en localhost, el flujo de Google OAuth utiliza el método `->stateless()`, delegando la verificación de estado a Sanctum de forma segura.
 
+### Idempotencia en Pedidos (React StrictMode)
+Para evitar la duplicidad de pedidos causada por la doble invocación de `useEffect` en el entorno de desarrollo de React, se implementó un patrón de control mediante `useRef` ("Semáforo"). Esto asegura que la petición de creación de pedido al backend solo se ejecute una única vez por montaje del componente, garantizando la integridad de los datos financieros.
+
 ### Gestión de CORS, CSRF y Axios
 Para asegurar la comunicación fluida y segura en un entorno de dominios cruzados (puertos diferentes):
 * **Backend:** Habilitado `supports_credentials => true`.
 * **Frontend (Axios):** Requiere configuración estricta global:
   * `withCredentials = true`: Envía la cookie de sesión (`laravel_session`).
   * `withXSRFToken = true`: Extrae y devuelve automáticamente el token `XSRF-TOKEN` a Laravel, parcheando restricciones de seguridad recientes (CVE) en clientes HTTP.
-
-### Estrategia de Logout (Hard Redirect)
-Para garantizar la destrucción total de la sesión `HttpOnly`, se utiliza una redirección física (`window.location.href`) hacia el endpoint `/logout` de Laravel. Esto fuerza al navegador a limpiar las cookies de sesión y evita estados inconsistentes en el cliente.
 
 ### Seguridad en Pedidos (Transacciones)
 El sistema **no confía** en los precios enviados por el frontend. Al procesar un pedido:
@@ -229,7 +230,7 @@ El sistema **no confía** en los precios enviados por el frontend. Al procesar u
 | **3. Carrito de Compra** | ✅ | Reservas de 15 min, Context API, Optimistic UI, Sincronización. |
 | **4. Gestión de Pedidos** | ✅ | Checkout completado, Transacciones DB, Limpieza de estado global. |
 | **5. Pasarela de Pagos** | ✅ | Integración de Stripe completada (Pagos, Webhook simulado y BBDD). |
-| **6. Panel de Administración**| ⏳ | Dashboard para gestionar productos, stock y estado de pedidos. |
+| **6. Panel de Administración**| 🚧 | Dashboard implementado con historial de pedidos. En proceso de mejora UI/UX. |
 
 ---
 **Autor:** Ángel - Desarrollador Full Stack Junior

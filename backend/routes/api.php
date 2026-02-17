@@ -30,13 +30,17 @@ Route::middleware('auth:sanctum')->group(function () {
     // 3. Crear un Pedido
     Route::post('/orders', [OrderController::class, 'store']);
 
-    // 4. Gestión del Carrito (Persistencia)
+    // 4. Listar todos los pedidos (Para el Dashboard y el Historial)
+    Route::get('/orders', [OrderController::class, 'index']);
+
+    // 5. Gestión del Carrito (Persistencia)
     Route::get('/cart', [CartController::class, 'index']);
     Route::post('/cart', [CartController::class, 'store']);
     Route::delete('/cart/{id}', [CartController::class, 'destroy']);
     Route::post('/cart/clear', [CartController::class, 'clear']);
 
-    // 5. Pasarela de Pagos (Stripe) <-- NUEVA RUTA
+    // 6. Pasarela de Pagos (Stripe) <-- NUEVA RUTA
     Route::post('/create-payment-intent', [PaymentController::class, 'createPaymentIntent']);
     
+
 });
