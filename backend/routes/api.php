@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\Api\CartController;
-use App\Http\Controllers\Api\PaymentController; // <--- IMPORTANTE: Importamos el controlador de pagos
+use App\Http\Controllers\Api\PaymentController;
 
 /*
 |--------------------------------------------------------------------------
@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\PaymentController; // <--- IMPORTANTE: Importamos e
 
 // 1. Catálogo de Productos
 Route::get('/products', [ProductController::class, 'index']);
+Route::get('/products/{id}', [ProductController::class, 'show']); // 👈 NUEVA: Ver detalle de producto
 
 
 // --- RUTAS PROTEGIDAS (Solo usuarios logueados) ---
@@ -36,11 +37,17 @@ Route::middleware('auth:sanctum')->group(function () {
     // 5. Gestión del Carrito (Persistencia)
     Route::get('/cart', [CartController::class, 'index']);
     Route::post('/cart', [CartController::class, 'store']);
+    Route::put('/cart/{id}', [CartController::class, 'update']);
     Route::delete('/cart/{id}', [CartController::class, 'destroy']);
     Route::post('/cart/clear', [CartController::class, 'clear']);
 
-    // 6. Pasarela de Pagos (Stripe) <-- NUEVA RUTA
+    // 6. Pasarela de Pagos (Stripe)
     Route::post('/create-payment-intent', [PaymentController::class, 'createPaymentIntent']);
-    
+
+    // 7. GESTIÓN DE PRODUCTOS (ADMINISTRACIÓN) 👈 NUEVO BLOQUE
+    // Estas rutas permiten modificar el catálogo desde el Dashboard
+    Route::post('/products', [ProductController::class, 'store']);       // Crear
+    Route::put('/products/{id}', [ProductController::class, 'update']);  // Editar
+    Route::delete('/products/{id}', [ProductController::class, 'destroy']); // Borrar
 
 });

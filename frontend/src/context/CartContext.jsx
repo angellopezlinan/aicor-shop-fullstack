@@ -20,13 +20,12 @@ export const CartProvider = ({ children }) => {
     
     const [timeRemaining, setTimeRemaining] = useState(null);
 
-    // 🔄 HIDRATACIÓN INICIAL (El Fix que faltaba)
-    // Nada más cargar la web, preguntamos al servidor cómo está la cosa.
+    // 🔄 HIDRATACIÓN INICIAL
     useEffect(() => {
         fetchCart();
     }, []);
 
-    // 3. Persistencia LocalStorage (Backup visual)
+    // 3. Persistencia LocalStorage
     useEffect(() => {
         localStorage.setItem('aicor_cart', JSON.stringify(cart));
     }, [cart]);
@@ -39,13 +38,12 @@ export const CartProvider = ({ children }) => {
         }
     }, [expirationTime]);
 
-    // 4. ⏱️ EL MOTOR DEL RELOJ (Heartbeat)
+    // 4. ⏱️ EL MOTOR DEL RELOJ
     useEffect(() => {
         let interval;
         if (cart.length > 0 && expirationTime) {
             interval = setInterval(() => {
                 const now = Date.now();
-                // Calculamos diferencia real contra la hora del servidor, no un contador simple
                 const timeLeft = Math.max(0, Math.floor((expirationTime - now) / 1000));
 
                 setTimeRemaining(timeLeft);
@@ -63,7 +61,7 @@ export const CartProvider = ({ children }) => {
 
     const handleCartExpiration = async () => {
         try {
-            await axios.post('http://localhost/api/cart/clear');
+            await axios.post('/api/cart/clear');
         } catch (error) {
             console.error("Error limpiando DB:", error);
         } finally {
@@ -72,113 +70,135 @@ export const CartProvider = ({ children }) => {
         }
     };
 
-    // 🔄 LÓGICA DE SINCRONIZACIÓN (Aquí está la magia del Viajero en el Tiempo)
+    // 🔄 LÓGICA DE SINCRONIZACIÓN
     const fetchCart = async () => {
         try {
-            const res = await axios.get('http://localhost/api/cart'); 
+            const res = await axios.get('/api/cart'); 
             const serverItems = res.data;
 
             if (serverItems.length > 0) {
-                // 1. Buscamos la fecha de expiración REAL más lejana en la BBDD
-                // Laravel nos envía 'expires_at' (ej: "2026-02-16T10:45:00.000000Z")
+                // Buscamos fecha expiración
                 const timestamps = serverItems.map(item => new Date(item.expires_at).getTime());
                 const serverExpiration = Math.max(...timestamps);
 
-                // 2. Si la fecha del servidor es futura, sincronizamos el reloj local
                 if (serverExpiration > Date.now()) {
                     setExpirationTime(serverExpiration);
                     
-                    // Mapeamos los productos para la vista
+                    // ⚠️ CAMBIO CLAVE: Guardamos item.id (ID del carrito) y item.product (Datos producto)
+                    // Esto es vital para que funcionen los botones + y -
                     const itemsFormatted = serverItems.map(item => ({
-                        id: item.product.id,
-                        name: item.product.name,
-                        price: item.product.price,
-                        image_url: item.product.image_url,
+                        id: item.id,              // ID de la línea del carrito (Primary Key)
+                        product: item.product,    // Objeto con nombre, precio, stock, imagen...
                         quantity: item.quantity
                     }));
                     setCart(itemsFormatted);
                 } else {
-                    // Si el servidor dice que ya caducó (aunque el local diga lo contrario)
                     handleCartExpiration(); 
                 }
             } else {
-                // Si el servidor devuelve array vacío, limpiamos todo
                 clearCart();
             }
         } catch (error) {
             console.error("Sync Error:", error);
-            // Si es error de Auth (401), limpiamos silenciosamente
             if (error.response && error.response.status === 401) clearCart();
         }
     };
 
     const addToCart = async (product) => {
-        // UI Optimista: Actualizamos visualmente al instante
-        setCart((prevCart) => {
-            const isExisting = prevCart.find(item => item.id === product.id);
-            if (isExisting) {
-                return prevCart.map(item =>
-                    item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
-                );
-            }
-            return [...prevCart, { ...product, quantity: 1 }];
-        });
+        // 1. Buscamos si ya existe este producto en el carrito
+        // Nota: item.product.id es donde está el ID real del producto ahora
+        const existingItem = cart.find(item => item.product.id === product.id);
+        
+        // 2. Si existe, sumamos 1. Si no, empezamos en 1.
+        const quantityToSend = existingItem ? existingItem.quantity + 1 : 1;
 
-        // Calculamos cantidad real para enviar
-        const currentItem = cart.find(item => item.id === product.id);
-        const quantityToSend = currentItem ? currentItem.quantity + 1 : 1;
+        // 3. UI Optimista (Para que veas el cambio al instante)
+        /* ... (Opcional, pero mejor esperamos al fetchCart para asegurar stock) ... */
 
         try {
-            // Enviamos a Laravel
-            const res = await axios.post('http://localhost/api/cart', {
+            // 4. Enviamos al Backend la NUEVA cantidad total
+            const res = await axios.post('/api/cart', {
                 product_id: product.id,
-                quantity: quantityToSend
+                quantity: quantityToSend // <--- AQUÍ ESTABA EL FALLO, ANTES PONÍA 1
             });
 
-            // ⚡ CLAVE: Usamos la fecha que nos devuelve Laravel en la respuesta
-            // Así garantizamos que backend y frontend tienen el mismo milisegundo de fin
+            // 5. Actualizamos el carrito con la respuesta real del servidor
+            await fetchCart(); 
+
+            // 6. Actualizamos el reloj
             if (res.data.item && res.data.item.expires_at) {
                 const newServerTime = new Date(res.data.item.expires_at).getTime();
                 setExpirationTime(newServerTime);
             }
+            return true;
 
         } catch (error) {
             console.error("Error add cart:", error);
-            // Si falla, podrías revertir el estado optimista aquí (Rollback)
+            alert(error.response?.data?.message || "No hay suficiente stock para añadir más");
+            return false;
         }
     };
 
-    const removeFromCart = async (productId) => {
-        setCart((prevCart) => prevCart.filter(item => item.id !== productId));
+    // 🆕 FUNCIÓN NUEVA: ACTUALIZAR CANTIDAD (+ / -)
+    const updateQuantity = async (cartItemId, newQuantity) => {
+        if (newQuantity < 1) return;
+
+        // 1. Optimistic UI (Para que se sienta rápido)
+        const oldCart = [...cart];
+        setCart(cart.map(item => item.id === cartItemId ? { ...item, quantity: newQuantity } : item));
+
+        try {
+            // 2. Llamada al Backend (PUT)
+            await axios.put(`/api/cart/${cartItemId}`, { quantity: newQuantity });
+            
+            // 3. Si sale bien, extendemos el tiempo (actividad detectada)
+            // Podríamos pedir la nueva fecha al backend, o sumar 15 min manualmente.
+            // Para asegurar, hacemos un fetch rápido o extendemos localmente:
+            setExpirationTime(Date.now() + 15 * 60 * 1000);
+
+        } catch (error) {
+            console.error("Error updating quantity:", error);
+            // 🛑 Si falla (ej: Stock insuficiente), revertimos el cambio visual
+            alert(error.response?.data?.message || "No hay suficiente stock");
+            setCart(oldCart);
+        }
+    };
+
+    const removeFromCart = async (cartItemId) => {
+        // UI Optimista
+        setCart((prevCart) => prevCart.filter(item => item.id !== cartItemId));
         
         try {
-            await axios.delete(`http://localhost/api/cart/${productId}`);
-            // Al borrar, idealmente deberíamos re-sincronizar el tiempo o dejarlo correr
-            // Si quieres reiniciar a 15 min al borrar (actividad de usuario), 
-            // deberías hacer un fetchCart() o que el delete devuelva el nuevo tiempo.
-            // Por simplicidad, dejamos que el tiempo siga corriendo.
+            await axios.delete(`/api/cart/${cartItemId}`);
         } catch (error) {
             console.error("Error delete:", error);
+            fetchCart(); // Si falla, recargamos para ver la verdad
         }
     };
 
-    const clearCart = () => {
+    const clearCart = async () => {
         setCart([]); 
         setIsCartOpen(false); 
         setExpirationTime(null); 
         setTimeRemaining(null);
         localStorage.removeItem('aicor_cart'); 
-        localStorage.removeItem('aicor_cart_timer'); 
+        localStorage.removeItem('aicor_cart_timer');
+        
+        // Intento de limpieza en servidor
+        try { await axios.post('/api/cart/clear'); } catch(e){}
     };
 
+    // Cálculos
     const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
-    const cartTotal = cart.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2);
+    // Ojo: Aseguramos que price sea número
+    const cartTotal = cart.reduce((total, item) => total + (parseFloat(item.product.price) * item.quantity), 0).toFixed(2);
 
     return (
         <CartContext.Provider value={{ 
             cart, 
             addToCart, 
             removeFromCart, 
+            updateQuantity, // 👈 Exportamos la nueva función
             clearCart,
             fetchCart, 
             cartCount, 

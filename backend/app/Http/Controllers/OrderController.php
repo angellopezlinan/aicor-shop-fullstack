@@ -14,16 +14,13 @@ class OrderController extends Controller
      */
     public function index()
     {
-        // Eager Loading ('with'):
-        // Traemos el pedido + los datos del usuario + los productos comprados
-        // todo de una vez para que la tabla cargue rápido.
         return Order::with(['user', 'items.product'])
-                    ->orderBy('created_at', 'desc') // Los más recientes primero
+                    ->orderBy('created_at', 'desc')
                     ->get();
     }
 
     /**
-     * Guarda un nuevo pedido desde el carrito (Checkout)
+     * Guarda un nuevo pedido y ACTUALIZA EL STOCK
      */
     public function store(Request $request)
     {
@@ -36,45 +33,65 @@ class OrderController extends Controller
             return response()->json(['message' => 'No hay productos en el carrito'], 400);
         }
 
-        // 2. Transacción ACID
-        return DB::transaction(function () use ($user, $cartItems) {
-            
-            // A. Crear Cabecera
-            $order = Order::create([
-                'user_id' => $user->id,
-                'status'  => 'paid', 
-                'total'   => 0,
-            ]);
-
-            $totalAmount = 0;
-
-            // B. Mover detalles
-            foreach ($cartItems as $item) {
-                $price = $item->product->price;
-                $quantity = $item->quantity;
-                $subtotal = $price * $quantity;
-
-                OrderItem::create([
-                    'order_id'   => $order->id,
-                    'product_id' => $item->product_id,
-                    'quantity'   => $quantity,
-                    'price'      => $price,
+        // 2. Transacción ACID (Todo o nada)
+        // Usamos try/catch para que si falta stock, se cancele todo automáticamente
+        try {
+            return DB::transaction(function () use ($user, $cartItems) {
+                
+                // A. Crear Cabecera del Pedido
+                $order = Order::create([
+                    'user_id' => $user->id,
+                    'status'  => 'paid', 
+                    'total'   => 0,
                 ]);
 
-                $totalAmount += $subtotal;
-            }
+                $totalAmount = 0;
 
-            // C. Actualizar total
-            $order->update(['total' => $totalAmount]);
+                // B. Procesar cada ítem
+                foreach ($cartItems as $item) {
+                    $product = $item->product;
+                    
+                    // 🛑 VALIDACIÓN DE SEGURIDAD (Critical Check)
+                    // Si alguien compró el último producto mientras tú pagabas, esto salta.
+                    if ($product->stock < $item->quantity) {
+                        throw new \Exception("Stock insuficiente para: " . $product->name);
+                    }
 
-            // D. Vaciar carrito
-            $user->cartItems()->delete();
+                    // 📉 RESTAR STOCK (El cambio clave)
+                    $product->decrement('stock', $item->quantity);
 
+                    // C. Crear línea de pedido
+                    $subtotal = $product->price * $item->quantity;
+                    
+                    OrderItem::create([
+                        'order_id'   => $order->id,
+                        'product_id' => $product->id,
+                        'quantity'   => $item->quantity,
+                        'price'      => $product->price,
+                    ]);
+
+                    $totalAmount += $subtotal;
+                }
+
+                // D. Actualizar total final
+                $order->update(['total' => $totalAmount]);
+
+                // E. Vaciar carrito
+                $user->cartItems()->delete();
+
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Pedido realizado y stock actualizado',
+                    'order_id' => $order->id
+                ], 201);
+            });
+
+        } catch (\Exception $e) {
+            // Si falta stock, devolvemos un error 409 (Conflicto)
             return response()->json([
-                'status' => 'success',
-                'message' => 'Pedido realizado correctamente',
-                'order_id' => $order->id
-            ], 201);
-        });
+                'error' => 'Stock Error',
+                'message' => $e->getMessage()
+            ], 409);
+        }
     }
 }
