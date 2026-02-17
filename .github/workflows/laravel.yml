@@ -8,8 +8,12 @@ on:
 
 jobs:
   laravel-tests:
-
     runs-on: ubuntu-latest
+    
+    # 👇 ESTO ES LO QUE HEMOS AÑADIDO: Le dice que todo ocurre dentro de /backend
+    defaults:
+      run:
+        working-directory: backend
 
     steps:
     - uses: actions/checkout@v4
