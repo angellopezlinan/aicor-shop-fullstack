@@ -1,0 +1,49 @@
+name: Laravel Tests (CI)
+
+on:
+  push:
+    branches: [ "main", "development", "feature/*" ]
+  pull_request:
+    branches: [ "main", "development" ]
+
+jobs:
+  laravel-tests:
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.3'
+        extensions: mbstring, dom, fileinfo, sqlite3
+        coverage: none
+
+    - name: Copy .env
+      run: php -r "file_exists('.env') || copy('.env.example', '.env');"
+
+    - name: Install Dependencies
+      # Hemos cambiado 'install' por 'update' y añadido '--ignore-platform-reqs' para evitar errores de compatibilidad
+      run: composer update -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist --ignore-platform-reqs
+
+    - name: Generate Key
+      run: php artisan key:generate
+
+    - name: Directory Permissions
+      run: chmod -R 777 storage bootstrap/cache
+
+    - name: Create Database
+      run: |
+        mkdir -p database
+        touch database/database.sqlite
+
+    - name: Execute Tests (Unit & Feature)
+      env:
+        DB_CONNECTION: sqlite
+        DB_DATABASE: database/database.sqlite
+      run: php artisan test

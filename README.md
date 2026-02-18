@@ -1,0 +1,147 @@
+# 🛒 AICOR Shop - Full Stack E-commerce
+
+![Laravel Tests](https://github.com/TU_USUARIO/TU_REPOSITORIO/actions/workflows/laravel.yml/badge.svg)
+Plataforma de comercio electrónico Full Stack implementada con arquitectura desacoplada (Headless). 
+El proyecto integra una API RESTful robusta en Laravel con una interfaz de usuario reactiva moderna en React, destacando por su sistema de **Inventario Virtual**, reservas temporales y un panel administrativo integral.
+
+## 🚀 Stack Tecnológico
+
+### Backend (API)
+* **Framework:** Laravel 12.5
+* **Lenguaje:** PHP 8.3
+* **Base de Datos:** MariaDB 11.4
+* **Testing:** PHPUnit (Feature & Unit Tests).
+* **Autenticación:** Laravel Socialite (Google OAuth Stateless) + Laravel Sanctum (Session/Cookies).
+* **Seguridad & Lógica:** Transacciones DB (ACID) para pedidos, Control de concurrencia de Stock, Configuración CORS/CSRF estricta.
+
+### Frontend (SPA)
+* **Framework:** React 18
+* **Estado Global:** React Context API (Gestión de Carrito Sincronizado y persistencia de sesión).
+* **Componentes:** Dashboard con sistema de pestañas (Pedidos/Inventario) y Modales reactivos.
+* **Build Tool:** Vite.
+* **Estilos:** Tailwind CSS v3.4 con animaciones personalizadas.
+* **HTTP Client:** Axios (Configurado con `withCredentials` y `withXSRFToken`).
+
+### Infraestructura (DevSecOps)
+* **Contenerización:** Docker & Laravel Sail.
+* **CI/CD:** GitHub Actions (Pipeline de ejecución automática de tests).
+* **Arquitectura:** Soporte nativo para ARM64 (Apple Silicon) y AMD64.
+
+---
+
+## 🛠️ Guía de Despliegue (Entorno Local)
+
+### 1. Inicializar Servicios Backend
+```bash
+cd backend
+cp .env.example .env
+# Configurar VITE_PORT=5174 y SANCTUM_STATEFUL_DOMAINS=localhost:5173
+./vendor/bin/sail up -d
+./vendor/bin/sail composer install
+./vendor/bin/sail artisan key:generate
+./vendor/bin/sail artisan migrate:fresh --seed
+```
+
+### 2. Ejecutar Suite de Tests (Opcional pero Recomendado)
+Para verificar la integridad del sistema y la lógica de negocio:
+```bash
+# Ejecuta tests unitarios y de integración en base de datos en memoria (SQLite)
+./vendor/bin/sail artisan test
+```
+
+### 3. Inicializar Cliente Frontend
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+---
+
+## 🏗️ Arquitectura del Sistema
+
+### Gestión de Stock y Pedidos (Blindaje Técnico)
+El sistema implementa una **Defensa en Profundidad** para evitar el *overselling*:
+1. **Frontend (Sidebar/Cart):** Validación visual que bloquea el botón "+" si se alcanza el stock máximo disponible en la BBDD.
+2. **Backend (Pre-pago):** Antes de generar el `PaymentIntent` de Stripe, se verifica de nuevo el almacén.
+3. **Backend (Post-pago):** El `OrderController` ejecuta una **transacción ACID** que valida el stock y aplica un `decrement('stock')` atómico al confirmar la compra.
+
+---
+
+## 🛡️ Calidad de Software & Testing (CI/CD)
+
+El proyecto cuenta con una pipeline de integración continua configurada en **GitHub Actions** que impide la subida de código defectuoso a la rama principal.
+
+### Estrategia de Pruebas (TDD)
+* **Unit Tests:** Verificación aislada de lógica de negocio (ej. cálculo de stock disponible en el Modelo `Product`).
+* **Feature Tests:** Validación de endpoints API (`GET /products`, flujo de datos JSON, códigos de respuesta HTTP).
+* **Database Testing:** Uso de `RefreshDatabase` y SQLite en memoria para garantizar entornos de prueba prístinos.
+
+---
+
+## 🗄️ Modelo de Datos (Base de Datos)
+
+```mermaid
+erDiagram
+    USER ||--o{ ORDER : "realiza"
+    USER ||--o{ CART_ITEM : "reserva temporamente"
+    ORDER ||--|{ ORDER_ITEM : "contiene"
+    PRODUCT ||--o{ ORDER_ITEM : "referenciado en"
+    PRODUCT ||--o{ CART_ITEM : "en cesta de"
+
+    PRODUCT {
+        bigint id PK
+        string name
+        decimal price
+        int stock
+        string image
+    }
+    CART_ITEM {
+        bigint id PK
+        int quantity
+        timestamp expires_at
+    }
+    ORDER {
+        bigint id PK
+        string status
+        decimal total
+        string stripe_id
+    }
+```
+
+---
+
+## 🔌 API Endpoints Documentados
+
+| Método | Endpoint | Descripción | Acceso |
+| :--- | :--- | :--- | :--- |
+| **Catálogo & Admin** | | | |
+| `GET` | `/api/products` | Lista completa de productos | 🌍 Público |
+| `POST` | `/api/products` | **Crear nuevo producto** | 🔐 Admin |
+| `PUT` | `/api/products/{id}` | **Editar stock/precio/info** | 🔐 Admin |
+| `DELETE` | `/api/products/{id}` | Eliminar producto | 🔐 Admin |
+| **Reservas (Carrito)** | | | |
+| `GET` | `/api/cart` | Recuperar cesta guardada | 🔐 Privado |
+| `POST` | `/api/cart` | Añadir / Incrementar cantidad | 🔐 Privado |
+| `PUT` | `/api/cart/{id}` | **Actualizar cantidad (+/-)** | 🔐 Privado |
+| `POST` | `/api/cart/clear` | Vaciar reservas | 🔐 Privado |
+| **Pedidos** | | | |
+| `GET` | `/api/orders` | Historial con detalles (Eager Loading) | 🔐 Admin |
+| `POST` | `/api/orders` | Procesar compra y restar stock | 🔐 Privado |
+
+---
+
+## 📅 Hoja de Ruta del Proyecto
+
+| Fase | Estado | Descripción |
+| :--- | :--- | :--- |
+| **1. Infraestructura & Auth** | ✅ | Docker, React, Laravel, Google Login Stateless. |
+| **2. Catálogo de Productos** | ✅ | API REST y Seeders de prueba. |
+| **3. Carrito de Compra** | ✅ | Reservas de 15 min, Botones +/- con validación de stock. |
+| **4. Gestión de Pedidos** | ✅ | Transacciones DB y reducción de stock atómica. |
+| **5. Pasarela de Pagos** | ✅ | Integración de Stripe (SCA Ready). |
+| **6. Panel de Administración**| ✅ | Dashboard integral con CRUD de productos y detalle de pedidos. |
+| **7. QA & CI/CD** | ✅ | Tests Unitarios/Feature y Pipeline de GitHub Actions. |
+
+---
+**Autor:** Ángel - Desarrollador Full Stack Junior

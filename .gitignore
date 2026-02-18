@@ -1,0 +1,23 @@
+# --- Laravel Backend ---
+/backend/.env
+/backend/vendor/
+/backend/storage/*.key
+/backend/storage/logs/
+
+# --- React Frontend ---
+/frontend/node_modules/
+/frontend/dist/
+/frontend/.env
+/frontend/.env.local
+
+# --- System & IDE ---
+.DS_Store
+.idea
+.vscode/
+
+# --- Security (Google & Auth0) ---
+# Bloquea claves específicas pero PERMITE package.json y composer.json
+client_secret*.json
+credentials.json
+auth.json
+service-account-*.json
