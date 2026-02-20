@@ -1,6 +1,23 @@
 # 🛒 AICOR Shop - Full Stack E-commerce
 
-![Laravel Tests](https://github.com/TU_USUARIO/TU_REPOSITORIO/actions/workflows/laravel.yml/badge.svg)
+![CI/CD Pipeline](https://img.shields.io/badge/build-passing-brightgreen)
+![Laravel 12](https://img.shields.io/badge/Laravel-12.x-FF2D20?style=flat&logo=laravel&logoColor=white)
+![React 18](https://img.shields.io/badge/React-18.x-61DAFB?style=flat&logo=react&logoColor=black)
+![Security-First](https://img.shields.io/badge/Security-First-blue?style=flat&logo=auth0)
+
+**AICOR Shop** is a production-ready, full-stack e-commerce application built with a strong focus on **Data Integrity, Security (OWASP guidelines), and Clean Architecture**. 
+
+---
+
+## 🎯 Resumen de Arquitectura (Highlights)
+* **🛡️ Security-First (Auth0):** Autenticación delegada a Auth0. Seeders personalizados para mapeo seguro de roles sin exponer credenciales.
+* **📦 Transacciones ACID:** El `OrderController` implementa `DB::beginTransaction()`. Cero datos corruptos en caso de fallo en el checkout.
+* **✨ Zero Lint Policy:** Frontend en React estricto. Cero warnings, código mantenible.
+* **🚀 DevSecOps & Infra:** Docker optimizado para **Apple Silicon (M1/ARM64)** y pipelines automatizados de CI/CD.
+
+---
+
+![Laravel Tests](https://github.com/angellopezlinan/aicor-shop-fullstack/actions/workflows/laravel.yml/badge.svg)
 Plataforma de comercio electrónico Full Stack implementada con arquitectura desacoplada (Headless). 
 El proyecto integra una API RESTful robusta en Laravel con una interfaz de usuario reactiva moderna en React, destacando por su sistema de **Inventario Virtual**, reservas temporales y un panel administrativo integral.
 
