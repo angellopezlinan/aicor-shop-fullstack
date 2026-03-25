@@ -8,12 +8,31 @@
 
 ---
 
-## 🏗️ Arquitectura del Sistema
+## 🚀 Stack Tecnológico (Versiones Reales)
 
-El proyecto opera bajo un modelo **de-coupled**:
-*   **Backend (API Control):** Laravel gestiona la lógica de negocio, inventario virtual (ACID) y seguridad en el puerto `8081`.
-*   **Frontend (SPA Experience):** React ofrece una interfaz reactiva, gestión de estado local y pasarela de pago en el puerto `5173`.
-*   **Comunicación:** Flujo Stateless vía Sanctum con protección CSRF/XSRF integrada.
+El entorno está orquestado con **Docker** asegurando total paridad entre desarrollo y producción:
+- **Backend Framework:** Laravel 12.5
+- **Runtime PHP:** v8.5 (FPM)
+- **Base de Datos:** MariaDB v12.2
+- **Caché / NoSQL:** Redis alpine
+- **Motor de Búsqueda:** Meilisearch (Latest)
+- **Frontend Runtime:** Node.js v20 (Alpine)
+- **Client Side:** React 18 + Vite
+
+---
+
+## 🗄️ Conexión a la Base de Datos (Host Externo)
+
+Si necesitas conectar con un cliente externo (ej. TablePlus, DBeaver) mientras los contenedores están activos:
+- **Host:** `127.0.0.1` o `localhost`
+- **Puerto:** `3306` (o el mapeado en `FORWARD_DB_PORT`)
+- **Usuario:** `sail` (Ver `.env`)
+- **Contraseña:** `password` (Ver `.env`)
+- **Base de Datos:** `laravel` (Ver `.env`)
+
+---
+
+## 🏗️ Arquitectura del Sistema
 
 ---
 
