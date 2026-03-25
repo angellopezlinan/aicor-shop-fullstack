@@ -37,6 +37,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Compras
     Route::post('/create-payment-intent', [PaymentController::class, 'createPaymentIntent']);
+    Route::get('/my-orders', [OrderController::class, 'userOrders']); // Historial personal
     Route::post('/orders', [OrderController::class, 'store']); // Crear pedido tras pagar
 
     // --- 🛡️ 3. RUTAS DE ADMINISTRADOR (Solo is_admin = true) ---

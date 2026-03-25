@@ -20,6 +20,17 @@ class OrderController extends Controller
     }
 
     /**
+     * Muestra la lista de pedidos del USUARIO actual (Mis Pedidos)
+     */
+    public function userOrders(Request $request)
+    {
+        return Order::where('user_id', $request->user()->id)
+            ->with('items.product')
+            ->orderBy('created_at', 'desc')
+            ->get();
+    }
+
+    /**
      * Guarda un nuevo pedido y ACTUALIZA EL STOCK
      */
     public function store(Request $request)

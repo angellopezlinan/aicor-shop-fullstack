@@ -12,7 +12,7 @@ class ProductController extends Controller
      */
     public function index()
     {
-        return Product::all();
+        return Product::with('category')->get();
     }
 
     /**
@@ -20,7 +20,7 @@ class ProductController extends Controller
      */
     public function show($id)
     {
-        return Product::findOrFail($id);
+        return Product::with('category')->findOrFail($id);
     }
 
     /**
@@ -33,6 +33,7 @@ class ProductController extends Controller
             'name' => 'required|string|max:255',
             'price' => 'required|numeric|min:0',
             'stock' => 'required|integer|min:0',
+            'category_id' => 'nullable|exists:categories,id',
             'description' => 'nullable|string',
             'image' => 'nullable|string', // Por ahora usaremos URLs de imágenes
         ]);
@@ -42,7 +43,7 @@ class ProductController extends Controller
 
         return response()->json([
             'message' => 'Producto creado con éxito',
-            'product' => $product,
+            'product' => $product->load('category'),
         ], 201);
     }
 
@@ -58,6 +59,7 @@ class ProductController extends Controller
             'name' => 'sometimes|string|max:255',
             'price' => 'sometimes|numeric|min:0',
             'stock' => 'sometimes|integer|min:0',
+            'category_id' => 'sometimes|nullable|exists:categories,id',
             'description' => 'nullable|string',
             'image' => 'nullable|string',
         ]);
@@ -67,7 +69,7 @@ class ProductController extends Controller
 
         return response()->json([
             'message' => 'Producto actualizado',
-            'product' => $product,
+            'product' => $product->load('category'),
         ]);
     }
 

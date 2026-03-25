@@ -7,6 +7,8 @@ import CartSidebar from './components/CartSidebar';
 import Checkout from './pages/Checkout';
 import Dashboard from './Dashboard';
 import OrderConfirmation from './pages/OrderConfirmation';
+import Orders from './pages/Orders';
+import Breadcrumbs from './components/Breadcrumbs';
 
 // Configuración global de Axios
 axios.defaults.withCredentials = true;
@@ -76,6 +78,7 @@ function App() {
       {user && <CartSidebar />}
 
       <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <Breadcrumbs />
         <Routes>
           {/* Ruta Principal: Publica (Para todos, admins incluidos) */}
           <Route path="/" element={<AuthenticatedHome user={user} />} />
@@ -104,6 +107,7 @@ function App() {
           } />
 
           <Route path="/order-confirmation" element={<OrderConfirmation />} />
+          <Route path="/orders" element={user ? <Orders /> : <LoginScreen />} />
         </Routes>
       </main>
     </div>
@@ -136,6 +140,13 @@ function Navbar({ user, isAdmin, onLogout }) {
                     ⚙️ Dashboard
                   </Link>
                 )}
+
+                <Link
+                  to="/orders"
+                  className="text-xs font-bold text-gray-600 hover:text-indigo-600 bg-gray-50 px-3 py-1 rounded-full transition border border-gray-100"
+                >
+                  📦 Mis Pedidos
+                </Link>
 
                 <button
                   onClick={onLogout}

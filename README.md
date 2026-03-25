@@ -4,81 +4,83 @@
 ![React 18](https://img.shields.io/badge/React-18.x-61DAFB?style=flat&logo=react&logoColor=black)
 ![Stripe](https://img.shields.io/badge/Stripe-SCA_Ready-5433FF?style=flat&logo=stripe&logoColor=white)
 
-**AICOR Shop** is a production-ready, headless e-commerce application. It features a de-coupled architecture with a **Laravel 12 API** serving a **React 18 SPA**, ensuring high performance, security, and scalability.
+**AICOR Shop** es una plataforma de comercio electrónico de alto rendimiento con arquitectura desacoplada (*Headless*). Combina la robustez de una API en **Laravel 12** con la agilidad de una SPA en **React 18**, ofreciendo una experiencia de compra segura, atómica y escalable.
 
 ---
 
-## 🏗️ Arquitectura Headless
+## 🏗️ Arquitectura del Sistema
 
-El proyecto está dividido en dos entidades totalmente independientes que se comunican vía API:
-
-*   **Backend (API):** Laravel 12 ejecutándose en `http://localhost:8081`.
-*   **Frontend (SPA):** React + Vite ejecutándose en `http://localhost:5173`.
-
----
-
-## 🛠️ Configuración de Entorno (.env)
-
-Para evitar conflictos en Docker, el proyecto utiliza una arquitectura de archivos `.env` separados. **No debe existir un archivo .env en la raíz del proyecto.**
-
-### 1. Backend (`backend/.env`)
-Crea este archivo basado en `backend/.env.example`. Variables críticas:
-```env
-APP_URL=http://localhost:8081
-FRONTEND_URL=http://localhost:5173
-SANCTUM_STATEFUL_DOMAINS=localhost:5173,127.0.0.1:5173
-
-# Stripe Keys (Proporcionadas por el admin)
-STRIPE_KEY=pk_test_...
-STRIPE_SECRET=sk_test_...
-```
-
-### 2. Frontend (`frontend/.env`)
-Crea este archivo en la carpeta frontend. Variables críticas:
-```env
-VITE_API_URL=http://localhost:8081
-VITE_STRIPE_PUBLIC_KEY=pk_test_...
-```
+El proyecto opera bajo un modelo **de-coupled**:
+*   **Backend (API Control):** Laravel gestiona la lógica de negocio, inventario virtual (ACID) y seguridad en el puerto `8081`.
+*   **Frontend (SPA Experience):** React ofrece una interfaz reactiva, gestión de estado local y pasarela de pago en el puerto `5173`.
+*   **Comunicación:** Flujo Stateless vía Sanctum con protección CSRF/XSRF integrada.
 
 ---
 
-## 🐳 Comandos de Docker (Laravel Sail)
+## 📋 Requisitos Previos
 
-El proyecto utiliza Docker para garantizar que todos los desarrolladores tengan el mismo entorno.
+- **Docker Desktop** (Soporte nativo para M1/M2/M3 y x86).
+- **Cuenta de Stripe** (Modo Test).
+- **Google Cloud Console** (Para OAuth Login).
 
-### Levantar el proyecto
-Desde la carpeta `backend/`:
+---
+
+## 🛠️ Instalación Rápida (Desde Cero)
+
+1.  **Clonar y Preparar Backend:**
+    ```bash
+    cd backend && cp .env.example .env
+    # Configurar claves en el .env antes del siguiente paso
+    ```
+2.  **Levantar Infraestructura:**
+    ```bash
+    ./vendor/bin/sail up -d
+    ./vendor/bin/sail artisan key:generate
+    ```
+3.  **Migración e Inventario:**
+    ```bash
+    ./vendor/bin/sail artisan migrate --seed
+    ```
+4.  **Preparar Frontend:**
+    ```bash
+    cd ../frontend && npm install
+    # Crear frontend/.env con VITE_API_URL=http://localhost:8081
+    ```
+5.  **Iniciar Desarrollo:**
+    ```bash
+    npm run dev
+    ```
+
+---
+
+## 📖 Diccionario de Variables (.env)
+
+| Variable | Ubicación | Función |
+| :--- | :--- | :--- |
+| `STRIPE_SECRET` | Backend | Clave privada para crear `PaymentIntents` (Crucial). |
+| `FRONTEND_URL` | Backend | Define a dónde redirige el backend tras el login/logout. |
+| `VITE_API_URL` | Frontend | Punto de acceso a la API (Normalmente `http://localhost:8081`). |
+| `SANCTUM_STATEFUL_DOMAINS` | Backend | Permite que el frontend comparta cookies de sesión con la API. |
+
+---
+
+## 🧹 Troubleshooting & Mantenimiento
+
+Si cambias claves o el sistema no refleja cambios en el `.env`, ejecuta estos comandos de "limpieza profunda":
+
 ```bash
-# Levantar contenedores (Laravel, MariaDB, Redis, Meilisearch, Mailpit, React)
-./vendor/bin/sail up -d
-
-# Inicializar Base de Datos (Primera vez)
-./vendor/bin/sail artisan migrate --seed
-```
-
-### Limpiar Caché y Refrescar Configuración
-Si realizas cambios en los archivos `.env`, **debes** limpiar la caché para que surtan efecto:
-```bash
+# Dentro de la carpeta backend/
 ./vendor/bin/sail artisan optimize:clear
-./vendor/bin/sail artisan config:cache
+./vendor/bin/sail artisan config:clear
 ./vendor/bin/sail restart laravel.test frontend
 ```
 
 ---
 
-## 💳 Flujo de Pago Seguro (Stripe)
-
-1. **Frontend:** Recopila los artículos y solicita un `PaymentIntent` al backend.
-2. **Backend:** Valida el stock, calcula el total y crea el intento en Stripe usando la `STRIPE_SECRET`. Devuelve el `client_secret` al frontend.
-3. **Frontend:** Usa la `VITE_STRIPE_PUBLIC_KEY` y el `client_secret` para montar el `PaymentElement` y confirmar el pago de forma segura.
-
----
-
-## 🛡️ Seguridad Implementada
-- **Protección CSRF/XSRF:** Laravel Sanctum configurado para SPAs.
-- **Transacciones ACID:** Los pedidos se procesan dentro de transacciones de base de datos para garantizar la integridad del stock.
-- **Middlewares de Roles:** Rutas administrativas protegidas por el middleware `admin` (is_admin: true).
-- **Zero Secrets on Frontend:** La clave secreta de Stripe nunca toca el código del cliente.
+## 🛡️ Auditoría de Seguridad & Calidad
+- **Transacciones Dobles:** El `OrderController` bloquea el stock *antes* y *después* del pago para evitar el overselling.
+- **Middleware Admin:** El acceso al CRUD de productos y categorías está blindado con `auth:sanctum` y validación de rol `is_admin`.
+- **Breadcrumbs & Historial:** Navegación mejorada con migas de pan dinámicas y sección "Mis Pedidos" para el cliente final.
 
 ---
-**Autor:** Ángel López | **Estado:** Estable / Producción-Ready
+**Autor:** Ángel López | **Estado:** Auditoría Finalizada - Estable
