@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\CartController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\CategoryController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -16,6 +17,8 @@ use Illuminate\Support\Facades\Route;
 // --- 🌍 1. RUTAS PÚBLICAS (Cualquiera) ---
 Route::get('/products', [ProductController::class, 'index']);
 Route::get('/products/{id}', [ProductController::class, 'show']);
+Route::get('/categories', [CategoryController::class, 'index']);
+Route::get('/categories/{id}', [CategoryController::class, 'show']);
 
 // --- 🔐 2. RUTAS PROTEGIDAS (Solo usuarios logueados) ---
 Route::middleware('auth:sanctum')->group(function () {
@@ -47,6 +50,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('/products/{id}', [ProductController::class, 'update']);
         Route::delete('/products/{id}', [ProductController::class, 'destroy']);
 
+        // CRUD completo de categorías
+        Route::post('/categories', [CategoryController::class, 'store']);
+        Route::put('/categories/{id}', [CategoryController::class, 'update']);
+        Route::delete('/categories/{id}', [CategoryController::class, 'destroy']);
     });
 
 });

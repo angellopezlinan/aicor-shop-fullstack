@@ -13,7 +13,21 @@ use Laravel\Socialite\Facades\Socialite;
 */
 
 Route::get('/', function () {
-    return ['Laravel' => app()->version()];
+    try {
+        \Illuminate\Support\Facades\DB::connection()->getPdo();
+        $dbStatus = 'Connected';
+    } catch (\Exception $e) {
+        $dbStatus = 'Disconnected';
+    }
+
+    return [
+        'status' => 'AICOR Shop API - Online 🚀',
+        'environment' => app()->environment(),
+        'database' => $dbStatus,
+        'frontend_url' => config('app.frontend_url'),
+        'security_audit' => 'Hardened (v8.5 parity)',
+        'message' => 'Visita la tienda oficial en el puerto 5173'
+    ];
 });
 
 // 1. Redirigir a Google (Añadido stateless)
@@ -37,15 +51,14 @@ Route::get('/auth/google/callback', function () {
     ]);
 
     Auth::login($user);
+    
+    // Determinar la ruta de destino según privilegios (isAdmin es boolean por el cast en User.php)
+    $redirectPath = $user->is_admin ? '/dashboard' : '/';
 
-    // Redirección a la raíz de React
-    return redirect('http://localhost:5173');
+    // Redirección física al Frontend
+    return redirect(config('app.frontend_url') . $redirectPath);
 });
 
-// 3. Ruta API para perfil de usuario
-Route::middleware('auth')->get('/api/user', function () {
-    return Auth::user();
-});
 
 // 4. Ruta para cerrar sesión (A prueba de balas con redirección física)
 Route::get('/logout', function (Request $request) {
@@ -56,5 +69,5 @@ Route::get('/logout', function (Request $request) {
 
     // IMPORTANTE: Redirigimos físicamente al usuario de vuelta al Frontend
     // Esto obliga al navegador a limpiar las cookies y recargar React desde cero
-    return redirect('http://localhost:5173');
+    return redirect(config('app.frontend_url'));
 });

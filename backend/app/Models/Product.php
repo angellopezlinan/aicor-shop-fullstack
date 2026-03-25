@@ -4,19 +4,29 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Laravel\Scout\Searchable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Product extends Model
 {
-    use HasFactory;
+    use HasFactory, Searchable;
 
     protected $fillable = [
         'name',
         'description',
         'price',
         'stock',
-        'image', // 👈 Corregido: Debe ser 'image' para coincidir con tu migración y tests
+        'image',
+        'category_id',
     ];
+
+    /**
+     * Relación con la categoría
+     */
+    public function category()
+    {
+        return $this->belongsTo(Category::class);
+    }
 
     /**
      * Relación con los ítems del carrito

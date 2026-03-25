@@ -10,20 +10,14 @@ import './index.css'
 import { CartProvider } from './context/CartContext'
 
 axios.defaults.withCredentials = true; 
-axios.defaults.baseURL = "http://localhost"; 
+axios.defaults.baseURL = import.meta.env.VITE_API_URL; 
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <CartProvider> 
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<App />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/checkout" element={<Checkout />} />
-          
-          {/* 👇 2. IMPORTANTE: Usamos el componente, no el texto fijo */}
-          <Route path="/order-confirmation" element={<OrderConfirmation />} />
-          
+          <Route path="/*" element={<App />} />
         </Routes>
       </BrowserRouter>
     </CartProvider>

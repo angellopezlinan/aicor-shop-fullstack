@@ -7,7 +7,7 @@ export default function ProductList() {
     const { addToCart } = useCart(); // <-- Obtenemos la función de añadir
 
     useEffect(() => {
-        axios.get('http://localhost/api/products')
+        axios.get('/api/products')
             .then(response => setProducts(response.data))
             .catch(() => {}); // Atrapamos el error pero no hacemos nada (o pones un estado de error si quieres)
     }, []);
@@ -18,7 +18,7 @@ export default function ProductList() {
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {products.map((product) => (
                     <div key={product.id} className="bg-white border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition">
-                        <img src={product.image_url} alt={product.name} className="h-48 w-full object-cover" />
+                        <img src={product.image} alt={product.name} className="h-48 w-full object-cover" />
                         <div className="p-4">
                             <div className="flex justify-between items-start">
                                 <h3 className="font-bold text-gray-800">{product.name}</h3>

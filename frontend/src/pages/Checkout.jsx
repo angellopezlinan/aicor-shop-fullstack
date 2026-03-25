@@ -20,10 +20,11 @@ export default function Checkout() {
         const createPaymentIntent = async () => {
             try {
                 // El backend calcula el total basado en la sesión/BBDD, no enviamos monto desde el front por seguridad
-                const { data } = await axios.post("http://localhost/api/create-payment-intent");
+                const { data } = await axios.post("/api/create-payment-intent");
                 setClientSecret(data.clientSecret);
-            } catch {
-                setError("No se pudo conectar con la pasarela de pago segura. Inténtalo de nuevo.");
+            } catch (error) {
+                console.log(error);
+                //setError("No se pudo conectar con la pasarela de pago segura. Inténtalo de nuevo.");
             }
         };
 

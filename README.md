@@ -1,164 +1,84 @@
-# 🛒 AICOR Shop - Full Stack E-commerce
+# 🛒 AICOR Shop - Full Stack E-commerce (Headless Architecture)
 
-![CI/CD Pipeline](https://img.shields.io/badge/build-passing-brightgreen)
 ![Laravel 12](https://img.shields.io/badge/Laravel-12.x-FF2D20?style=flat&logo=laravel&logoColor=white)
 ![React 18](https://img.shields.io/badge/React-18.x-61DAFB?style=flat&logo=react&logoColor=black)
-![Security-First](https://img.shields.io/badge/Security-First-blue?style=flat&logo=auth0)
+![Stripe](https://img.shields.io/badge/Stripe-SCA_Ready-5433FF?style=flat&logo=stripe&logoColor=white)
 
-**AICOR Shop** is a production-ready, full-stack e-commerce application built with a strong focus on **Data Integrity, Security (OWASP guidelines), and Clean Architecture**. 
-
----
-
-## 🎯 Resumen de Arquitectura (Highlights)
-* **🛡️ Security-First (Auth0):** Autenticación delegada a Auth0. Seeders personalizados para mapeo seguro de roles sin exponer credenciales.
-* **📦 Transacciones ACID:** El `OrderController` implementa `DB::beginTransaction()`. Cero datos corruptos en caso de fallo en el checkout.
-* **✨ Zero Lint Policy:** Frontend en React estricto. Cero warnings, código mantenible.
-* **🚀 DevSecOps & Infra:** Docker optimizado para **Apple Silicon (M1/ARM64)** y pipelines automatizados de CI/CD.
+**AICOR Shop** is a production-ready, headless e-commerce application. It features a de-coupled architecture with a **Laravel 12 API** serving a **React 18 SPA**, ensuring high performance, security, and scalability.
 
 ---
 
-![Laravel Tests](https://github.com/angellopezlinan/aicor-shop-fullstack/actions/workflows/laravel.yml/badge.svg)
-Plataforma de comercio electrónico Full Stack implementada con arquitectura desacoplada (Headless). 
-El proyecto integra una API RESTful robusta en Laravel con una interfaz de usuario reactiva moderna en React, destacando por su sistema de **Inventario Virtual**, reservas temporales y un panel administrativo integral.
+## 🏗️ Arquitectura Headless
 
-## 🚀 Stack Tecnológico
+El proyecto está dividido en dos entidades totalmente independientes que se comunican vía API:
 
-### Backend (API)
-* **Framework:** Laravel 12.5
-* **Lenguaje:** PHP 8.3
-* **Base de Datos:** MariaDB 11.4
-* **Testing:** PHPUnit (Feature & Unit Tests).
-* **Autenticación:** Laravel Socialite (Google OAuth Stateless) + Laravel Sanctum (Session/Cookies).
-* **Seguridad & Lógica:** Transacciones DB (ACID) para pedidos, Control de concurrencia de Stock, Configuración CORS/CSRF estricta.
-
-### Frontend (SPA)
-* **Framework:** React 18
-* **Estado Global:** React Context API (Gestión de Carrito Sincronizado y persistencia de sesión).
-* **Componentes:** Dashboard con sistema de pestañas (Pedidos/Inventario) y Modales reactivos.
-* **Build Tool:** Vite.
-* **Estilos:** Tailwind CSS v3.4 con animaciones personalizadas.
-* **HTTP Client:** Axios (Configurado con `withCredentials` y `withXSRFToken`).
-
-### Infraestructura (DevSecOps)
-* **Contenerización:** Docker & Laravel Sail.
-* **CI/CD:** GitHub Actions (Pipeline de ejecución automática de tests).
-* **Arquitectura:** Soporte nativo para ARM64 (Apple Silicon) y AMD64.
+*   **Backend (API):** Laravel 12 ejecutándose en `http://localhost:8081`.
+*   **Frontend (SPA):** React + Vite ejecutándose en `http://localhost:5173`.
 
 ---
 
-## 🛠️ Guía de Despliegue (Entorno Local)
+## 🛠️ Configuración de Entorno (.env)
 
-### 1. Inicializar Servicios Backend
+Para evitar conflictos en Docker, el proyecto utiliza una arquitectura de archivos `.env` separados. **No debe existir un archivo .env en la raíz del proyecto.**
+
+### 1. Backend (`backend/.env`)
+Crea este archivo basado en `backend/.env.example`. Variables críticas:
+```env
+APP_URL=http://localhost:8081
+FRONTEND_URL=http://localhost:5173
+SANCTUM_STATEFUL_DOMAINS=localhost:5173,127.0.0.1:5173
+
+# Stripe Keys (Proporcionadas por el admin)
+STRIPE_KEY=pk_test_...
+STRIPE_SECRET=sk_test_...
+```
+
+### 2. Frontend (`frontend/.env`)
+Crea este archivo en la carpeta frontend. Variables críticas:
+```env
+VITE_API_URL=http://localhost:8081
+VITE_STRIPE_PUBLIC_KEY=pk_test_...
+```
+
+---
+
+## 🐳 Comandos de Docker (Laravel Sail)
+
+El proyecto utiliza Docker para garantizar que todos los desarrolladores tengan el mismo entorno.
+
+### Levantar el proyecto
+Desde la carpeta `backend/`:
 ```bash
-cd backend
-cp .env.example .env
-# Configurar VITE_PORT=5174 y SANCTUM_STATEFUL_DOMAINS=localhost:5173
+# Levantar contenedores (Laravel, MariaDB, Redis, Meilisearch, Mailpit, React)
 ./vendor/bin/sail up -d
-./vendor/bin/sail composer install
-./vendor/bin/sail artisan key:generate
-./vendor/bin/sail artisan migrate:fresh --seed
+
+# Inicializar Base de Datos (Primera vez)
+./vendor/bin/sail artisan migrate --seed
 ```
 
-### 2. Ejecutar Suite de Tests (Opcional pero Recomendado)
-Para verificar la integridad del sistema y la lógica de negocio:
+### Limpiar Caché y Refrescar Configuración
+Si realizas cambios en los archivos `.env`, **debes** limpiar la caché para que surtan efecto:
 ```bash
-# Ejecuta tests unitarios y de integración en base de datos en memoria (SQLite)
-./vendor/bin/sail artisan test
-```
-
-### 3. Inicializar Cliente Frontend
-```bash
-cd frontend
-npm install
-npm run dev
+./vendor/bin/sail artisan optimize:clear
+./vendor/bin/sail artisan config:cache
+./vendor/bin/sail restart laravel.test frontend
 ```
 
 ---
 
-## 🏗️ Arquitectura del Sistema
+## 💳 Flujo de Pago Seguro (Stripe)
 
-### Gestión de Stock y Pedidos (Blindaje Técnico)
-El sistema implementa una **Defensa en Profundidad** para evitar el *overselling*:
-1. **Frontend (Sidebar/Cart):** Validación visual que bloquea el botón "+" si se alcanza el stock máximo disponible en la BBDD.
-2. **Backend (Pre-pago):** Antes de generar el `PaymentIntent` de Stripe, se verifica de nuevo el almacén.
-3. **Backend (Post-pago):** El `OrderController` ejecuta una **transacción ACID** que valida el stock y aplica un `decrement('stock')` atómico al confirmar la compra.
+1. **Frontend:** Recopila los artículos y solicita un `PaymentIntent` al backend.
+2. **Backend:** Valida el stock, calcula el total y crea el intento en Stripe usando la `STRIPE_SECRET`. Devuelve el `client_secret` al frontend.
+3. **Frontend:** Usa la `VITE_STRIPE_PUBLIC_KEY` y el `client_secret` para montar el `PaymentElement` y confirmar el pago de forma segura.
 
 ---
 
-## 🛡️ Calidad de Software & Testing (CI/CD)
-
-El proyecto cuenta con una pipeline de integración continua configurada en **GitHub Actions** que impide la subida de código defectuoso a la rama principal.
-
-### Estrategia de Pruebas (TDD)
-* **Unit Tests:** Verificación aislada de lógica de negocio (ej. cálculo de stock disponible en el Modelo `Product`).
-* **Feature Tests:** Validación de endpoints API (`GET /products`, flujo de datos JSON, códigos de respuesta HTTP).
-* **Database Testing:** Uso de `RefreshDatabase` y SQLite en memoria para garantizar entornos de prueba prístinos.
+## 🛡️ Seguridad Implementada
+- **Protección CSRF/XSRF:** Laravel Sanctum configurado para SPAs.
+- **Transacciones ACID:** Los pedidos se procesan dentro de transacciones de base de datos para garantizar la integridad del stock.
+- **Middlewares de Roles:** Rutas administrativas protegidas por el middleware `admin` (is_admin: true).
+- **Zero Secrets on Frontend:** La clave secreta de Stripe nunca toca el código del cliente.
 
 ---
-
-## 🗄️ Modelo de Datos (Base de Datos)
-
-```mermaid
-erDiagram
-    USER ||--o{ ORDER : "realiza"
-    USER ||--o{ CART_ITEM : "reserva temporamente"
-    ORDER ||--|{ ORDER_ITEM : "contiene"
-    PRODUCT ||--o{ ORDER_ITEM : "referenciado en"
-    PRODUCT ||--o{ CART_ITEM : "en cesta de"
-
-    PRODUCT {
-        bigint id PK
-        string name
-        decimal price
-        int stock
-        string image
-    }
-    CART_ITEM {
-        bigint id PK
-        int quantity
-        timestamp expires_at
-    }
-    ORDER {
-        bigint id PK
-        string status
-        decimal total
-        string stripe_id
-    }
-```
-
----
-
-## 🔌 API Endpoints Documentados
-
-| Método | Endpoint | Descripción | Acceso |
-| :--- | :--- | :--- | :--- |
-| **Catálogo & Admin** | | | |
-| `GET` | `/api/products` | Lista completa de productos | 🌍 Público |
-| `POST` | `/api/products` | **Crear nuevo producto** | 🔐 Admin |
-| `PUT` | `/api/products/{id}` | **Editar stock/precio/info** | 🔐 Admin |
-| `DELETE` | `/api/products/{id}` | Eliminar producto | 🔐 Admin |
-| **Reservas (Carrito)** | | | |
-| `GET` | `/api/cart` | Recuperar cesta guardada | 🔐 Privado |
-| `POST` | `/api/cart` | Añadir / Incrementar cantidad | 🔐 Privado |
-| `PUT` | `/api/cart/{id}` | **Actualizar cantidad (+/-)** | 🔐 Privado |
-| `POST` | `/api/cart/clear` | Vaciar reservas | 🔐 Privado |
-| **Pedidos** | | | |
-| `GET` | `/api/orders` | Historial con detalles (Eager Loading) | 🔐 Admin |
-| `POST` | `/api/orders` | Procesar compra y restar stock | 🔐 Privado |
-
----
-
-## 📅 Hoja de Ruta del Proyecto
-
-| Fase | Estado | Descripción |
-| :--- | :--- | :--- |
-| **1. Infraestructura & Auth** | ✅ | Docker, React, Laravel, Google Login Stateless. |
-| **2. Catálogo de Productos** | ✅ | API REST y Seeders de prueba. |
-| **3. Carrito de Compra** | ✅ | Reservas de 15 min, Botones +/- con validación de stock. |
-| **4. Gestión de Pedidos** | ✅ | Transacciones DB y reducción de stock atómica. |
-| **5. Pasarela de Pagos** | ✅ | Integración de Stripe (SCA Ready). |
-| **6. Panel de Administración**| ✅ | Dashboard integral con CRUD de productos y detalle de pedidos. |
-| **7. QA & CI/CD** | ✅ | Tests Unitarios/Feature y Pipeline de GitHub Actions. |
-
----
-**Autor:** Ángel - Desarrollador Full Stack Junior
+**Autor:** Ángel López | **Estado:** Estable / Producción-Ready

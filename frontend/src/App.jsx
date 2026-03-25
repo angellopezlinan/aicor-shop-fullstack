@@ -6,10 +6,12 @@ import ProductList from './components/ProductList';
 import CartSidebar from './components/CartSidebar';
 import Checkout from './pages/Checkout';
 import Dashboard from './Dashboard';
+import OrderConfirmation from './pages/OrderConfirmation';
 
 // Configuración global de Axios
 axios.defaults.withCredentials = true;
 axios.defaults.withXSRFToken = true;
+axios.defaults.baseURL = import.meta.env.VITE_API_URL;
 
 /**
  * Componente Principal de la Aplicación
@@ -21,7 +23,7 @@ function App() {
 
   // 1. Definimos la lógica de verificación de usuario primero (Evita errores de Hoisting)
   const checkUser = () => {
-    axios.get('http://localhost/api/user')
+    axios.get('/api/user')
       .then(res => {
         setUser(res.data);
         fetchCart();
@@ -35,22 +37,29 @@ function App() {
 
   // 2. Ejecutamos el efecto de inicialización
   useEffect(() => {
-    // Inicializar CSRF antes de cualquier petición
-    axios.get('http://localhost/sanctum/csrf-cookie')
+    const apiUrl = import.meta.env.VITE_API_URL.replace('/api', '');
+
+    // Inicializar CSRF antes de cualquier petición (Ruta absoluta fuera de /api)
+    axios.get(`${apiUrl}/sanctum/csrf-cookie`)
       .then(() => {
         checkUser();
       })
-      .catch(() => {
-        // En caso de fallo CSRF, intentamos cargar usuario de todas formas
+      .catch((error) => {
+        console.error("CSRF Error:", error);
+        // Intentamos cargar usuario de todas formas
         checkUser();
       });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
+ // eslint-disable-line react-hooks/exhaustive-deps
 
   // Manejador de Logout
   const handleLogout = () => {
     // Redirigir al endpoint de logout del backend
-    window.location.href = "http://localhost/logout";
+    window.location.href = `${import.meta.env.VITE_API_URL.replace('/api', '')}/logout`;
   };
+
+  // Ayudante para determinar si es admin (Soporta boolean, string "1" o integer 1)
+  const isAdmin = user?.is_admin == true || user?.is_admin == 1;
 
   if (loading) {
     return (
@@ -62,36 +71,38 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
-      <Navbar user={user} onLogout={handleLogout} />
+      <Navbar user={user} isAdmin={isAdmin} onLogout={handleLogout} />
 
       {user && <CartSidebar />}
 
       <main className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <Routes>
-          {/* Ruta Principal: Tienda o Login */}
-          <Route path="/" element={
-            user ? (
-              <AuthenticatedHome user={user} />
-            ) : (
-              <LoginScreen />
-            )
-          } />
+          {/* Ruta Principal: Publica (Para todos, admins incluidos) */}
+          <Route path="/" element={<AuthenticatedHome user={user} />} />
 
-          {/* Ruta Dashboard: Solo Admin */}
+          {/* Ruta Dashboard: Solo Admin (Bloqueo estricto) */}
           <Route path="/dashboard" element={
-            user && (user.is_admin === 1 || user.is_admin === true) ? (
-              <Dashboard />
-            ) : (
-              <LoginScreen />
-            )
+            (() => {
+              console.log("🔍 [Debug Router] Usuario actual:", user);
+              console.log("🔍 [Debug Router] isAdmin:", isAdmin);
+              return isAdmin ? (
+                <Dashboard />
+              ) : (
+                <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl shadow-xl border border-red-50">
+                  <div className="text-6xl mb-6">🔒</div>
+                  <h2 className="text-3xl font-extrabold text-gray-900 mb-2 text-center">Acceso Restringido</h2>
+                  <p className="text-gray-500 mb-8 text-center max-w-md">No tienes permisos para ver esta sección.</p>
+                  <Link to="/" className="text-indigo-600 font-bold hover:underline">Volver a la Tienda</Link>
+                </div>
+              );
+            })()
           } />
 
-          {/* Ruta Checkout */}
+          {/* Rutas de Compra: Solo Autenticados */}
           <Route path="/checkout" element={
             user ? <Checkout /> : <LoginScreen />
           } />
 
-          {/* Ruta Confirmación */}
           <Route path="/order-confirmation" element={<OrderConfirmation />} />
         </Routes>
       </main>
@@ -101,9 +112,8 @@ function App() {
 
 // --- Subcomponentes (Podrían moverse a archivos separados en un futuro refactor) ---
 
-function Navbar({ user, onLogout }) {
+function Navbar({ user, isAdmin, onLogout }) {
   const { cartCount, setIsCartOpen } = useCart();
-  const isAdmin = user?.is_admin === 1 || user?.is_admin === true;
 
   return (
     <header className="bg-white shadow-sm sticky top-0 z-20">
@@ -148,7 +158,15 @@ function Navbar({ user, onLogout }) {
               </button>
             </div>
           ) : (
-            <span className="text-xs text-gray-400">Inicia sesión para comprar</span>
+            <div className="flex items-center gap-4">
+              <a
+                href={`${import.meta.env.VITE_API_URL.replace('/api', '')}/auth/google/redirect`}
+                className="flex items-center gap-2 bg-white border border-gray-300 px-4 py-2 rounded-full text-sm font-bold text-gray-700 hover:bg-gray-50 transition shadow-sm"
+              >
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-4 h-4" />
+                Entrar
+              </a>
+            </div>
           )}
         </div>
       </div>
@@ -159,17 +177,26 @@ function Navbar({ user, onLogout }) {
 function AuthenticatedHome({ user }) {
   return (
     <>
-      <div className="bg-white rounded-2xl p-8 mb-8 shadow-sm border border-indigo-50 flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold text-gray-900">
-            ¡Hola de nuevo, {user.name.split(' ')[0]}! 👋
-          </h2>
-          <p className="text-gray-500 mt-2">
-            Tus productos reservados están a salvo (15 min).
-          </p>
+      {user ? (
+        <div className="bg-white rounded-2xl p-8 mb-8 shadow-sm border border-indigo-50 flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-bold text-gray-900">
+              Hola, {user.name.split(' ')[0]}
+            </h2>
+            <p className="text-gray-500 mt-2">
+              Tus productos reservados están a salvo.
+            </p>
+          </div>
+          <div className="hidden sm:block text-5xl">🚀</div>
         </div>
-        <div className="hidden sm:block text-5xl">🚀</div>
-      </div>
+      ) : (
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-8 mb-8 shadow-lg text-white flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-bold">Bienvenido a AICOR Shop</h2>
+            <p className="text-indigo-100 mt-2">Explora los mejores productos tecnológicos.</p>
+          </div>
+        </div>
+      )}
       <ProductList />
     </>
   );
@@ -186,22 +213,12 @@ function LoginScreen() {
         Inicia sesión para descubrir productos exclusivos y gestionar tu carrito.
       </p>
       <a
-        href="http://localhost/auth/google/redirect"
+        href={`${import.meta.env.VITE_API_URL.replace('/api', '')}/auth/google/redirect`}
         className="flex items-center gap-3 bg-white border border-gray-300 px-8 py-4 rounded-xl font-bold text-gray-700 shadow-md hover:shadow-lg hover:bg-gray-50 transition-all active:scale-95"
       >
         <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-6 h-6" />
         Continuar con Google
       </a>
-    </div>
-  );
-}
-
-function OrderConfirmation() {
-  return (
-    <div className="text-center py-20">
-      <h2 className="text-3xl font-bold text-green-600">¡Pedido Confirmado! 🎉</h2>
-      <p className="mt-4">Gracias por tu compra.</p>
-      <Link to="/" className="mt-8 inline-block text-indigo-600 underline">Volver a la tienda</Link>
     </div>
   );
 }
