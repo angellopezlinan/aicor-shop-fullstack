@@ -39,6 +39,76 @@ graph LR
     Laravel -- Pagos --> Stripe[Stripe API]
 ```
 
+### 🗄️ Modelo de Datos (Diagrama ER)
+
+<details>
+  <summary>Haz clic para expandir el Diagrama Entidad-Relación</summary>
+
+  #### Descripción de Entidades y Atributos:
+  - **USER** (Fondo lavanda):
+    - `bigint id PK`
+  - **PRODUCT** (Fondo lavanda):
+    - `bigint id PK`
+    - `string name`
+    - `decimal price`
+    - `int stock`
+    - `string image`
+  - **CART_ITEM** (Fondo lavanda):
+    - `bigint id PK`
+    - `int quantity`
+    - `timestamp expires_at` (Campo crítico para Anti-Overselling)
+  - **ORDER** (Fondo lavanda):
+    - `bigint id PK`
+    - `string status`
+    - `decimal total`
+    - `string stripe_id`
+  - **ORDER_ITEM** (Fondo lavanda):
+    - `bigint id PK`
+
+  #### Representación Visual (Mermaid JS):
+
+  ```mermaid
+  erDiagram
+      USER ||--o{ ORDER : realiza
+      USER ||--o{ CART_ITEM : "reserva temporalmente"
+      PRODUCT ||--o{ CART_ITEM : "en cesta de"
+      PRODUCT ||--o{ ORDER_ITEM : "referenciado en"
+      ORDER ||--o{ ORDER_ITEM : contiene
+
+      USER {
+          bigint id PK
+      }
+
+      PRODUCT {
+          bigint id PK
+          string name
+          decimal price
+          int stock
+          string image
+      }
+
+      CART_ITEM {
+          bigint id PK
+          int quantity
+          timestamp expires_at
+      }
+
+      ORDER {
+          bigint id PK
+          string status
+          decimal total
+          string stripe_id
+      }
+
+      ORDER_ITEM {
+          bigint id PK
+      }
+  ```
+
+  > [!NOTE]
+  > *Esquema relacional estricto diseñado para garantizar la integridad de los datos y prevenir condiciones de carrera, totalmente coherente con la lógica de atomicidad de stock presentada.*
+</details>
+
 ---
 
 ## 🚀 Stack Tecnológico (Versiones Verificadas)
