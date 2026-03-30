@@ -4,6 +4,7 @@
 ![React 18](https://img.shields.io/badge/React-18.x-61DAFB?style=flat&logo=react&logoColor=black)
 ![Docker ARM64](https://img.shields.io/badge/Docker-ARM64_Nativo-2496ED?style=flat&logo=docker&logoColor=white)
 ![Stripe](https://img.shields.io/badge/Stripe-SCA_Preparado-5433FF?style=flat&logo=stripe&logoColor=white)
+![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub_Actions-2088FF?style=flat&logo=github-actions&logoColor=white)
 
 **AICOR Shop** es una plataforma de comercio electrónico de alto rendimiento desarrollada como **Proyecto de Fin de Grado (DAW)**. El sistema utiliza una **Arquitectura Headless**, desacoplando un backend robusto en **Laravel 12** de una interfaz ágil en **React 18**. El entorno actual está optimizado para su despliegue y evaluación en local mediante Docker, aunque su arquitectura sigue estándares preparados para entornos de producción.
 
@@ -137,11 +138,19 @@ Si realiza cambios en el archivo `.env` y el sistema no los refleja, ejecute una
 
 ---
 
-## 🛡️ Auditoría de Calidad y Seguridad
-- **Atomicidad de Stock:** El `OrderController` valida la disponibilidad del producto antes y después de procesar el pago.
-- **Control de Acceso:** Los endpoints administrativos están blindados mediante `auth:sanctum` y middleware de rol `is_admin`.
-- **Escalabilidad:** La arquitectura desacoplada permite el escalado independiente de las capas frontend y backend.
-- **Limitación de Peticiones (Rate Limiting):** Los endpoints críticos de la API están protegidos contra ataques de fuerza bruta y escaneo utilizando el middleware `ThrottleRequests` de Laravel.
+## 🛡️ Auditoría de Calidad y Seguridad (DevSecOps)
+
+- **Protección Front-End:** Consumo hermético de la API mediante instancias de Axios con `withCredentials: true` y validación estricta de tokens CSRF (`/sanctum/csrf-cookie`).
+- **Atomicidad de Stock (Anti-Overselling):** El `OrderController` utiliza transacciones ACID (`DB::transaction`) para validar la disponibilidad en milisegundos y ejecutar un *Rollback* automático en caso de falta de inventario.
+- **Quality Gate (CI/CD):** Pipeline automatizada en GitHub Actions. Cada *push* levanta un entorno efímero y ejecuta la suite de tests unitarios (TDD con PHPUnit) sobre una base de datos SQLite en memoria, bloqueando cualquier paso a producción que rompa la integridad.
+- **Control de Acceso y Rate Limiting:** Endpoints administrativos blindados por `auth:sanctum` y middleware `ThrottleRequests` contra ataques de fuerza bruta.
+
+---
+
+## 🗺️ Roadmap y Proyección a Futuro
+
+Al haber consolidado una arquitectura 100% API-First (Headless), el ecosistema está preparado para su escalabilidad horizontal. 
+- [ ] **Fase 2:** Desarrollo de aplicación móvil nativa utilizando **React Native**, consumiendo los mismos endpoints de la API de Laravel sin necesidad de refactorizar la lógica de negocio.
 
 ---
 **Desarrollador Responsable:** Ángel López | **Estado del Proyecto:** Listo para Evaluación - Estable
